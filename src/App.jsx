@@ -53,19 +53,26 @@ function App() {
       });
   };
 
-  // Select all playlists
+  // Select all playlists and all songs in each playlist
   const handleSelectAllPlaylists = (checked) => {
     const newSelectedPlaylists = {};
-    const newSelectedTracks = { ...selectedTracks };
+    const newSelectedTracks = {};
     playlists.forEach(pl => {
       newSelectedPlaylists[pl.id] = checked;
-      // If selecting all, fetch tracks if not already fetched
-      if (checked && !tracks[pl.id]) fetchTracks(pl.id);
-      // If deselecting all, clear selected tracks for this playlist
-      if (!checked) newSelectedTracks[pl.id] = {};
+      if (checked) {
+        // If tracks are loaded, select all songs
+        if (tracks[pl.id]) {
+          newSelectedTracks[pl.id] = Object.fromEntries(tracks[pl.id].map(track => [track.id, true]));
+        } else {
+          // If not loaded, fetch and select all when loaded
+          fetchTracks(pl.id);
+        }
+      } else {
+        newSelectedTracks[pl.id] = {};
+      }
     });
     setSelectedPlaylists(newSelectedPlaylists);
-    if (!checked) setSelectedTracks(newSelectedTracks);
+    setSelectedTracks(newSelectedTracks);
   };
 
   // Select all songs in a playlist
@@ -109,6 +116,20 @@ function App() {
   // Helper: is any track in a playlist selected?
   const anyTrackSelected = (playlistId) =>
     tracks[playlistId] && tracks[playlistId].some(track => selectedTracks[playlistId]?.[track.id]);
+
+  // When tracks are loaded for a playlist, if 'select all playlists' is active, select all songs in that playlist
+  useEffect(() => {
+    if (playlists.length === 0) return;
+    playlists.forEach(pl => {
+      if (selectedPlaylists[pl.id] && tracks[pl.id] && Object.keys(selectedTracks[pl.id] || {}).length === 0) {
+        setSelectedTracks(st => ({
+          ...st,
+          [pl.id]: Object.fromEntries(tracks[pl.id].map(track => [track.id, true]))
+        }));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tracks]);
 
   // UI rendering
   if (!authenticated) {

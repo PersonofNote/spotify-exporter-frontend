@@ -13,6 +13,7 @@ function App() {
   const [selectedTracks, setSelectedTracks] = useState({}); // { playlistId: { trackId: true } }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [collapsedPlaylists, setCollapsedPlaylists] = useState({}); // { playlistId: true/false }
 
   // Check if authenticated (look for ?auth=success in URL)
   useEffect(() => {
@@ -86,11 +87,19 @@ function App() {
     }));
   };
 
-  // Checkbox logic for playlists
+  // Checkbox logic for playlists: select/deselect all tracks in the playlist
   const handlePlaylistSelect = (playlistId, checked) => {
     setSelectedPlaylists(p => ({ ...p, [playlistId]: checked }));
-    if (checked && !tracks[playlistId]) fetchTracks(playlistId);
-    if (!checked) {
+    if (checked) {
+      if (tracks[playlistId]) {
+        setSelectedTracks(st => ({
+          ...st,
+          [playlistId]: Object.fromEntries(tracks[playlistId].map(track => [track.id, true]))
+        }));
+      } else {
+        fetchTracks(playlistId);
+      }
+    } else {
       setSelectedTracks(st => ({ ...st, [playlistId]: {} }));
     }
   };
@@ -117,9 +126,8 @@ function App() {
   const anyTrackSelected = (playlistId) =>
     tracks[playlistId] && tracks[playlistId].some(track => selectedTracks[playlistId]?.[track.id]);
 
-  // When tracks are loaded for a playlist, if 'select all playlists' is active, select all songs in that playlist
+  // When tracks are loaded for a playlist, if its checkbox is checked, select all tracks in that playlist
   useEffect(() => {
-    if (playlists.length === 0) return;
     playlists.forEach(pl => {
       if (selectedPlaylists[pl.id] && tracks[pl.id] && Object.keys(selectedTracks[pl.id] || {}).length === 0) {
         setSelectedTracks(st => ({
@@ -130,6 +138,12 @@ function App() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks]);
+
+  // Toggle collapse/expand for a playlist
+  const toggleCollapse = (playlistId) => {
+    if (!tracks[playlistId]) fetchTracks(playlistId);
+    setCollapsedPlaylists(cp => ({ ...cp, [playlistId]: !cp[playlistId] }));
+  };
 
   // UI rendering
   if (!authenticated) {
@@ -164,19 +178,16 @@ function App() {
                 checked={!!selectedPlaylists[pl.id]}
                 onChange={e => handlePlaylistSelect(pl.id, e.target.checked)}
               />
-              {pl.name}
             </label>
-            {selectedPlaylists[pl.id] && tracks[pl.id] && (
+              <span
+                style={{ cursor: 'pointer', fontWeight: 'bold', marginLeft: 8 }}
+                onClick={() => toggleCollapse(pl.id)}
+              >
+                {collapsedPlaylists[pl.id] ? '▶' : '▼'} {pl.name}
+              </span>
+
+            {tracks[pl.id] && !collapsedPlaylists[pl.id] && (
               <div style={{ marginLeft: 20 }}>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={allTracksSelected(pl.id)}
-                    indeterminate={anyTrackSelected(pl.id) && !allTracksSelected(pl.id)}
-                    onChange={e => handleSelectAllTracksInPlaylist(pl.id, e.target.checked)}
-                  />
-                  Select All Songs in Playlist
-                </label>
                 <ul>
                   {tracks[pl.id].map(track => (
                     <li key={track.id}>

@@ -15,6 +15,8 @@ function App() {
   const [error, setError] = useState('');
   const [collapsedPlaylists, setCollapsedPlaylists] = useState({}); // { playlistId: true/false }
   const [loadingTracks, setLoadingTracks] = useState({}); // { playlistId: true/false }
+  const [fileFormat, setFileFormat] = useState('csv');
+  const [downloading, setDownloading] = useState(false);
 
   // Check if authenticated (look for ?auth=success in URL)
   useEffect(() => {
@@ -173,11 +175,53 @@ function App() {
     }
   }, [playlists]);
 
+  // Prepare selected data for download
+  const getSelectedData = () => {
+    return playlists
+      .filter(pl => selectedPlaylists[pl.id])
+      .map(pl => ({
+        id: pl.id,
+        name: pl.name,
+        tracks: (tracks[pl.id] || []).filter(track => selectedTracks[pl.id]?.[track.id])
+      }));
+  };
+
+  // Download handler
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      const selectedData = getSelectedData();
+      if (selectedData.length === 0) {
+        alert('Please select at least one playlist and song.');
+        setDownloading(false);
+        return;
+      }
+      const res = await axios.post(
+        '/api/download',
+        { data: selectedData, format: fileFormat },
+        { responseType: 'blob', withCredentials: true }
+      );
+      // Create a blob and trigger download
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `spotify_export.${fileFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Failed to download file.');
+    }
+    setDownloading(false);
+  };
+
   // UI rendering
   if (!authenticated) {
     return (
       <div className="container">
         <h1>Spotify Playlist Collector</h1>
+        <p> Select and download playlist information to .csv, .json, or .txt</p>
         <a className="login-btn" href={`/auth/login`}>Login with Spotify</a>
       </div>
     );
@@ -191,6 +235,19 @@ function App() {
       <div style={{ marginBottom: 12 }}>
         <strong>{numPlaylists} playlists found</strong><br />
         <span>{numSelectedPlaylists} playlists / {numSelectedSongs} songs selected</span>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label>
+          File format:
+          <select value={fileFormat} onChange={e => setFileFormat(e.target.value)} style={{ marginLeft: 8 }}>
+            <option value="csv">CSV</option>
+            <option value="json">JSON</option>
+            <option value="txt">TXT</option>
+          </select>
+        </label>
+        <button onClick={handleDownload} disabled={downloading} style={{ marginLeft: 16 }}>
+          {downloading ? 'Preparing...' : 'Download'}
+        </button>
       </div>
       <label>
         <input

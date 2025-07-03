@@ -2,23 +2,19 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import './App.css';
 
-// Use relative paths for Vite proxy
-const BACKEND_URL = '';
-
 function App() {
   const [authenticated, setAuthenticated] = useState(false);
   const [playlists, setPlaylists] = useState([]);
   const [selectedPlaylists, setSelectedPlaylists] = useState({});
   const [tracks, setTracks] = useState({}); // { playlistId: [tracks] }
   const [selectedTracks, setSelectedTracks] = useState({}); // { playlistId: { trackId: true } }
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [collapsedPlaylists, setCollapsedPlaylists] = useState({}); // { playlistId: true/false }
   const [loadingTracks, setLoadingTracks] = useState({}); // { playlistId: true/false }
   const [fileFormat, setFileFormat] = useState('csv');
   const [downloading, setDownloading] = useState(false);
 
-  // Check if authenticated (look for ?auth=success in URL)
   useEffect(() => {
     if (window.location.search.includes('auth=success')) {
       setAuthenticated(true);
@@ -26,7 +22,6 @@ function App() {
     }
   }, []);
 
-  // Fetch playlists after auth
   useEffect(() => {
     if (authenticated) {
       setLoading(true);
@@ -42,7 +37,6 @@ function App() {
     }
   }, [authenticated]);
 
-  // Fetch all tracks for all playlists after playlists are loaded
   useEffect(() => {
     if (playlists.length > 0) {
       playlists.forEach(pl => {
@@ -64,10 +58,8 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlists]);
 
-  // Show loader while any tracks are loading
   const anyTracksLoading = Object.values(loadingTracks).some(Boolean);
 
-  // Select all playlists and all songs in each playlist
   const handleSelectAllPlaylists = (checked) => {
     const newSelectedPlaylists = {};
     const newSelectedTracks = {};
@@ -100,7 +92,6 @@ function App() {
     }));
   };
 
-  // Checkbox logic for playlists: select/deselect all tracks in the playlist
   const handlePlaylistSelect = (playlistId, checked) => {
     setSelectedPlaylists(p => ({ ...p, [playlistId]: checked }));
     if (checked) {
@@ -117,7 +108,6 @@ function App() {
     }
   };
 
-  // Checkbox logic for tracks
   const handleTrackSelect = (playlistId, trackId, checked) => {
     setSelectedTracks(st => ({
       ...st,
@@ -128,18 +118,14 @@ function App() {
     }));
   };
 
-  // Helper: is all playlists selected?
   const allPlaylistsSelected = playlists.length > 0 && playlists.every(pl => selectedPlaylists[pl.id]);
-  // Helper: is all tracks in a playlist selected?
   const allTracksSelected = (playlistId) =>
     tracks[playlistId] && tracks[playlistId].length > 0 &&
     tracks[playlistId].every(track => selectedTracks[playlistId]?.[track.id]);
 
-  // Helper: is any track in a playlist selected?
   const anyTrackSelected = (playlistId) =>
     tracks[playlistId] && tracks[playlistId].some(track => selectedTracks[playlistId]?.[track.id]);
 
-  // When tracks are loaded for a playlist, if its checkbox is checked, select all tracks in that playlist
   useEffect(() => {
     playlists.forEach(pl => {
       if (selectedPlaylists[pl.id] && tracks[pl.id] && Object.keys(selectedTracks[pl.id] || {}).length === 0) {
@@ -152,18 +138,16 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks]);
 
-  // Toggle collapse/expand for a playlist
   const toggleCollapse = (playlistId) => {
     if (!tracks[playlistId]) fetchTracks(playlistId);
     setCollapsedPlaylists(cp => ({ ...cp, [playlistId]: !cp[playlistId] }));
   };
 
-  // Count selected playlists and songs
   const numPlaylists = playlists.length;
   const numSelectedPlaylists = playlists.filter(pl => selectedPlaylists[pl.id]).length;
   const numSelectedSongs = Object.values(selectedTracks).reduce((acc, tracksObj) => acc + Object.values(tracksObj).filter(Boolean).length, 0);
 
-  // Collapse all playlists by default when playlists are loaded
+  // Collapse all playlists by default  when playlists are loaded
   useEffect(() => {
     if (playlists.length > 0) {
       setCollapsedPlaylists(
@@ -175,33 +159,32 @@ function App() {
     }
   }, [playlists]);
 
-  // Prepare selected data for download
-  const getSelectedData = () => {
+  const getSelectionForBackend = () => {
     return playlists
       .filter(pl => selectedPlaylists[pl.id])
       .map(pl => ({
-        id: pl.id,
-        name: pl.name,
-        tracks: (tracks[pl.id] || []).filter(track => selectedTracks[pl.id]?.[track.id])
-      }));
+        playlistId: pl.id,
+        trackIds: (tracks[pl.id] || [])
+          .filter(track => selectedTracks[pl.id]?.[track.id])
+          .map(track => track.id)
+      }))
+      .filter(sel => sel.trackIds.length > 0);
   };
 
-  // Download handler
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const selectedData = getSelectedData();
-      if (selectedData.length === 0) {
+      const selection = getSelectionForBackend();
+      if (selection.length === 0) {
         alert('Please select at least one playlist and song.');
         setDownloading(false);
         return;
       }
       const res = await axios.post(
         '/api/download',
-        { data: selectedData, format: fileFormat },
+        { selection, format: fileFormat },
         { responseType: 'blob', withCredentials: true }
       );
-      // Create a blob and trigger download
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement('a');
       a.href = url;
@@ -216,7 +199,6 @@ function App() {
     setDownloading(false);
   };
 
-  // UI rendering
   if (!authenticated) {
     return (
       <div className="container">
@@ -229,39 +211,52 @@ function App() {
 
   return (
     <div className="container">
-      <h1>Spotify Playlist Collector</h1>
-      {(loading || anyTracksLoading) && <p>Loading...</p>}
+      <h1>Spotify Playlist Collector</h1> 
       {error && <p style={{ color: 'red' }}>{error}</p>}
-      <div style={{ marginBottom: 12 }}>
-        <strong>{numPlaylists} playlists found</strong><br />
-        <span>{numSelectedPlaylists} playlists / {numSelectedSongs} songs selected</span>
-      </div>
-      <div className="download-container">
-        <label>
-          File format:
-          <select value={fileFormat} onChange={e => setFileFormat(e.target.value)} style={{ marginLeft: 8 }}>
-            <option value="csv">CSV</option>
-            <option value="json">JSON</option>
-            <option value="txt">TXT</option>
-          </select>
-        </label>
-        <button onClick={handleDownload} disabled={downloading} className="download-btn">
-          {downloading ? 'Preparing...' : 'Download'}
-        </button>
-      </div>
+        <div className="info-container">
+          <strong>{numPlaylists} playlists found</strong><br />
+          <span>{numSelectedPlaylists} playlists / {numSelectedSongs} songs selected</span>
+        </div>
+        {anyTracksLoading ? (
+          <div className="loading-container" aria-label="Loading..."><div style={{ width: '300px', height: '24px' }} className="shimmer"></div></div>
+        ) : (
+          <div className="download-container">
+          <label>
+            File format:
+            <select value={fileFormat} onChange={e => setFileFormat(e.target.value)} style={{ marginLeft: 8 }}>
+              <option value="csv">CSV</option>
+              <option value="json">JSON</option>
+              <option value="txt">TXT</option>
+            </select>
+          </label>
+          <button onClick={handleDownload} disabled={downloading} className="download-btn">
+            {downloading ? 'Preparing...' : 'Download'}
+          </button>
+        </div>
+        )}
+
+    {anyTracksLoading ? (
       <label>
-        <input
-          type="checkbox"
-          checked={allPlaylistsSelected}
-          onChange={e => handleSelectAllPlaylists(e.target.checked)}
-        />
-        Select All Playlists and Songs
+        <div className="loading-container" aria-label="Loading..."><div style={{ width: '300px', height: '24px' }} className="shimmer"></div></div>
       </label>
+    ) : ( 
+      <label>
+    <input
+            type="checkbox"
+            checked={allPlaylistsSelected}
+            onChange={e => handleSelectAllPlaylists(e.target.checked)}
+          />
+          Select All Playlists and Songs
+        </label>)}
       <ul>
         {playlists.map(pl => (
           <li key={pl.id}>
-            <div className="playlist-container">
-              <label style={{ margin: 0, padding: 0, display: 'flex', alignItems: 'center' }}>
+
+              {(loading || anyTracksLoading) ? (
+                <div className="loading-container" aria-label="Loading..."><div style={{ width: '300px', height: '24px' }} className="shimmer"></div></div>
+              ) : (
+                <div className="playlist-container">
+                <label>
                 <input
                   type="checkbox"
                   checked={!!selectedPlaylists[pl.id]}
@@ -271,20 +266,6 @@ function App() {
               <button
                 className="playlist-button"
                 onClick={() => toggleCollapse(pl.id)}
-                style={{
-                  cursor: 'pointer',
-                  fontWeight: 'bold',
-                  marginLeft: 0,
-                  border: 'none',
-                  background: 'none',
-                  padding: 0,
-                  display: 'block',
-                  textAlign: 'left',
-                  whiteSpace: 'normal',
-                  wordBreak: 'break-word',
-                  flex: 1,
-                  minWidth: 0
-                }}
               >
                 {collapsedPlaylists[pl.id] ? '▶' : '▼'}{' '}
                 <span style={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>
@@ -292,7 +273,8 @@ function App() {
                   {tracks[pl.id] ? ` (${tracks[pl.id].length} songs: ${Object.values(selectedTracks[pl.id] || {}).filter(Boolean).length} selected)` : ''}
                 </span>
               </button>
-            </div>
+              </div>
+            )}
 
             {tracks[pl.id] && !collapsedPlaylists[pl.id] && (
               <div style={{ marginLeft: 20 }}>

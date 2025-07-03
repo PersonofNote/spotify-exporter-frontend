@@ -14,6 +14,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [collapsedPlaylists, setCollapsedPlaylists] = useState({}); // { playlistId: true/false }
+  const [loadingTracks, setLoadingTracks] = useState({}); // { playlistId: true/false }
 
   // Check if authenticated (look for ?auth=success in URL)
   useEffect(() => {
@@ -39,20 +40,30 @@ function App() {
     }
   }, [authenticated]);
 
-  // Fetch tracks for a playlist
-  const fetchTracks = (playlistId) => {
-    if (tracks[playlistId]) return; // already fetched
-    setLoading(true);
-    axios.get(`/api/playlists/${playlistId}/tracks`, { withCredentials: true })
-      .then(res => {
-        setTracks(t => ({ ...t, [playlistId]: res.data.tracks }));
-        setLoading(false);
-      })
-      .catch(() => {
-        setError('Failed to fetch tracks');
-        setLoading(false);
+  // Fetch all tracks for all playlists after playlists are loaded
+  useEffect(() => {
+    if (playlists.length > 0) {
+      playlists.forEach(pl => {
+        if (!tracks[pl.id] && !loadingTracks[pl.id]) {
+          setLoadingTracks(lt => ({ ...lt, [pl.id]: true }));
+          axios.get(`/api/playlists/${pl.id}/tracks`, { withCredentials: true })
+            .then(res => {
+              setTracks(t => ({ ...t, [pl.id]: res.data.tracks }));
+            })
+            .catch(() => {
+              setError('Failed to fetch tracks');
+            })
+            .finally(() => {
+              setLoadingTracks(lt => ({ ...lt, [pl.id]: false }));
+            });
+        }
       });
-  };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playlists]);
+
+  // Show loader while any tracks are loading
+  const anyTracksLoading = Object.values(loadingTracks).some(Boolean);
 
   // Select all playlists and all songs in each playlist
   const handleSelectAllPlaylists = (checked) => {
@@ -145,6 +156,23 @@ function App() {
     setCollapsedPlaylists(cp => ({ ...cp, [playlistId]: !cp[playlistId] }));
   };
 
+  // Count selected playlists and songs
+  const numPlaylists = playlists.length;
+  const numSelectedPlaylists = playlists.filter(pl => selectedPlaylists[pl.id]).length;
+  const numSelectedSongs = Object.values(selectedTracks).reduce((acc, tracksObj) => acc + Object.values(tracksObj).filter(Boolean).length, 0);
+
+  // Collapse all playlists by default when playlists are loaded
+  useEffect(() => {
+    if (playlists.length > 0) {
+      setCollapsedPlaylists(
+        playlists.reduce((acc, pl) => {
+          acc[pl.id] = true;
+          return acc;
+        }, {})
+      );
+    }
+  }, [playlists]);
+
   // UI rendering
   if (!authenticated) {
     return (
@@ -158,16 +186,19 @@ function App() {
   return (
     <div className="container">
       <h1>Spotify Playlist Collector</h1>
-      {loading && <p>Loading...</p>}
+      {(loading || anyTracksLoading) && <p>Loading...</p>}
       {error && <p style={{ color: 'red' }}>{error}</p>}
-      <h2>Your Playlists</h2>
+      <div style={{ marginBottom: 12 }}>
+        <strong>{numPlaylists} playlists found</strong><br />
+        <span>{numSelectedPlaylists} playlists / {numSelectedSongs} songs selected</span>
+      </div>
       <label>
         <input
           type="checkbox"
           checked={allPlaylistsSelected}
           onChange={e => handleSelectAllPlaylists(e.target.checked)}
         />
-        Select All Playlists
+        Select All Playlists and Songs
       </label>
       <ul>
         {playlists.map(pl => (
@@ -179,18 +210,19 @@ function App() {
                 onChange={e => handlePlaylistSelect(pl.id, e.target.checked)}
               />
             </label>
-              <span
-                style={{ cursor: 'pointer', fontWeight: 'bold', marginLeft: 8 }}
+              <button
+                className="playlist-button"
                 onClick={() => toggleCollapse(pl.id)}
               >
                 {collapsedPlaylists[pl.id] ? '▶' : '▼'} {pl.name}
-              </span>
+                {tracks[pl.id] ? ` (${tracks[pl.id].length} songs: ${Object.values(selectedTracks[pl.id] || {}).filter(Boolean).length} selected)` : ''}
+              </button>
 
             {tracks[pl.id] && !collapsedPlaylists[pl.id] && (
               <div style={{ marginLeft: 20 }}>
                 <ul>
                   {tracks[pl.id].map(track => (
-                    <li key={track.id}>
+                    <li key={`${pl.id}-${track.id}`}>
                       <label>
                         <input
                           type="checkbox"

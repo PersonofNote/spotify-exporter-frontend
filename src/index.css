@@ -92,12 +92,67 @@ button:focus-visible {
   background-color: darkgreen;
 }
 
+.download-container {
+  margin-bottom: 16px;
+  display:  flex;
+  align-items:  center;
+  justify-content: center;
+}
+
 .download-btn {
-  background-color: green;
+  margin-left: 16px;
+  border: 1px solid green;
   color: #fff;
 }
 
 .download-btn:hover {
   background-color: darkgreen;
 }
+
+li {
+  padding: 8px 0;
+  word-break: break-word;
+  white-space: pre-line;
+  margin: 0;
+  max-width: 600px;
+}
+
+li.playlist-tracks {
+  padding: 4px 0;
+}
+
+.playlist-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.playlist-track-title {
+  word-break: break-word;
+  white-space: pre-line;
+  flex: 1;
+}
+
+select {
+  padding:3px;
+  margin: 0;
+  border-radius:4px;
+  box-shadow: 0 3px 0 #ccc, 0 -1px #fff inset;
+  background: #f8f8f8;
+  color:#888;
+  border:none;
+  outline:none;
+  display: inline-block;
+  appearance:none;
+  cursor:pointer;
+}
+
+label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
 

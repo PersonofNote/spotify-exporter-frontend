@@ -236,7 +236,7 @@ function App() {
         <strong>{numPlaylists} playlists found</strong><br />
         <span>{numSelectedPlaylists} playlists / {numSelectedSongs} songs selected</span>
       </div>
-      <div style={{ marginBottom: 16 }}>
+      <div className="download-container">
         <label>
           File format:
           <select value={fileFormat} onChange={e => setFileFormat(e.target.value)} style={{ marginLeft: 8 }}>
@@ -245,7 +245,7 @@ function App() {
             <option value="txt">TXT</option>
           </select>
         </label>
-        <button onClick={handleDownload} disabled={downloading} style={{ marginLeft: 16 }}>
+        <button onClick={handleDownload} disabled={downloading} className="download-btn">
           {downloading ? 'Preparing...' : 'Download'}
         </button>
       </div>
@@ -260,33 +260,54 @@ function App() {
       <ul>
         {playlists.map(pl => (
           <li key={pl.id}>
-            <label>
-              <input
-                type="checkbox"
-                checked={!!selectedPlaylists[pl.id]}
-                onChange={e => handlePlaylistSelect(pl.id, e.target.checked)}
-              />
-            </label>
+            <div className="playlist-container">
+              <label style={{ margin: 0, padding: 0, display: 'flex', alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  checked={!!selectedPlaylists[pl.id]}
+                  onChange={e => handlePlaylistSelect(pl.id, e.target.checked)}
+                />
+              </label>
               <button
                 className="playlist-button"
                 onClick={() => toggleCollapse(pl.id)}
+                style={{
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  marginLeft: 0,
+                  border: 'none',
+                  background: 'none',
+                  padding: 0,
+                  display: 'block',
+                  textAlign: 'left',
+                  whiteSpace: 'normal',
+                  wordBreak: 'break-word',
+                  flex: 1,
+                  minWidth: 0
+                }}
               >
-                {collapsedPlaylists[pl.id] ? '▶' : '▼'} {pl.name}
-                {tracks[pl.id] ? ` (${tracks[pl.id].length} songs: ${Object.values(selectedTracks[pl.id] || {}).filter(Boolean).length} selected)` : ''}
+                {collapsedPlaylists[pl.id] ? '▶' : '▼'}{' '}
+                <span style={{ wordBreak: 'break-word', whiteSpace: 'normal' }}>
+                  {pl.name}
+                  {tracks[pl.id] ? ` (${tracks[pl.id].length} songs: ${Object.values(selectedTracks[pl.id] || {}).filter(Boolean).length} selected)` : ''}
+                </span>
               </button>
+            </div>
 
             {tracks[pl.id] && !collapsedPlaylists[pl.id] && (
               <div style={{ marginLeft: 20 }}>
-                <ul>
+                <ul className="playlist-tracks">
                   {tracks[pl.id].map(track => (
-                    <li key={`${pl.id}-${track.id}`}>
+                    <li key={`${pl.id}-${track.id}`} className="playlist-track">
                       <label>
                         <input
                           type="checkbox"
                           checked={!!(selectedTracks[pl.id]?.[track.id])}
                           onChange={e => handleTrackSelect(pl.id, track.id, e.target.checked)}
                         />
-                        {track.title} – {track.artists.join(', ')}
+                        <span className="playlist-track-title">
+                          <strong>{track.title}</strong> – {track.artists.join(', ')}
+                        </span>
                       </label>
                     </li>
                   ))}
@@ -296,7 +317,6 @@ function App() {
           </li>
         ))}
       </ul>
-      {/* File format and download UI will go here */}
     </div>
   );
 }

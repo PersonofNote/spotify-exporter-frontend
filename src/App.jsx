@@ -193,6 +193,21 @@ function App() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
+      
+      const skippedTracksHeader = res.headers['x-skipped-tracks'];
+      if (skippedTracksHeader) {
+        try {
+          const skippedTracks = JSON.parse(skippedTracksHeader);
+          if (skippedTracks.length > 0) {
+            const skippedList = skippedTracks.map(track => 
+              `${track.title} (${track.playlistName})`
+            ).join(', ');
+            setError(`Some tracks could not be processed: ${skippedList}`);
+          }
+        } catch (e) {
+          console.error('Failed to parse skipped tracks header:', e);
+        }
+      }
     } catch (err) {
       alert('Failed to download file.');
     }
@@ -234,6 +249,7 @@ function App() {
           </button>
         </div>
         )}
+    {downloading && <div style={{ margin: '2rem 0', width: '100%', textAlign: 'center', color: 'orange' }}><strong>Large libraries may take a while to download.</strong></div>}
 
     {anyTracksLoading ? (
       <label>

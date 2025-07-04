@@ -14,6 +14,8 @@ function App() {
   const [loadingTracks, setLoadingTracks] = useState({}); // { playlistId: true/false }
   const [fileFormat, setFileFormat] = useState('csv');
   const [downloading, setDownloading] = useState(false);
+  const [skippedTracks, setSkippedTracks] = useState([]);
+  const [showSkippedTracks, setShowSkippedTracks] = useState(false);
 
   useEffect(() => {
     if (window.location.search.includes('auth=success')) {
@@ -199,10 +201,8 @@ function App() {
         try {
           const skippedTracks = JSON.parse(skippedTracksHeader);
           if (skippedTracks.length > 0) {
-            const skippedList = skippedTracks.map(track => 
-              `${track.title} (${track.playlistName})`
-            ).join(', ');
-            setError(`Some tracks could not be processed: ${skippedList}`);
+            setSkippedTracks(skippedTracks);
+            setShowSkippedTracks(false); // Start collapsed
           }
         } catch (e) {
           console.error('Failed to parse skipped tracks header:', e);
@@ -233,7 +233,7 @@ function App() {
           <span>{numSelectedPlaylists} playlists / {numSelectedSongs} songs selected</span>
         </div>
         {anyTracksLoading ? (
-          <div className="loading-container" aria-label="Loading..."><div style={{ width: '300px', height: '24px' }} className="shimmer"></div></div>
+          <div className="loading-container" aria-label="Loading..."><div style={{ width: '100%', height: '24px', margin: '16px 0' }} className="shimmer"></div></div>
         ) : (
           <div className="download-container">
           <label>
@@ -244,12 +244,31 @@ function App() {
               <option value="txt">TXT</option>
             </select>
           </label>
-          <button onClick={handleDownload} disabled={downloading} className="download-btn">
+          <button onClick={handleDownload} disabled={downloading} style={{ marginLeft: 16 }}>
             {downloading ? 'Preparing...' : 'Download'}
           </button>
         </div>
         )}
-    {downloading && <div style={{ margin: '2rem 0', width: '100%', textAlign: 'center', color: 'orange' }}><strong>Large libraries may take a while to download.</strong></div>}
+        {skippedTracks.length > 0 && (
+        <div style={{ margin: '16px 0', padding: 12, border: '1px solid #ff6b6b', borderRadius: 4, backgroundColor: '#fff5f5' }}>
+          <div 
+            style={{ cursor: 'pointer', fontWeight: 'bold', color: '#d63031' }}
+            onClick={() => setShowSkippedTracks(!showSkippedTracks)}
+          >
+            {skippedTracks.length} track{skippedTracks.length !== 1 ? 's' : ''} weren't able to be processed: {showSkippedTracks ? '▼' : '▶'} Show list
+          </div>
+          {showSkippedTracks && (
+            <ul style={{ marginTop: 8, marginBottom: 0, paddingLeft: 20, color: '#d63031' }}>
+              {skippedTracks.map((track, index) => (
+                <li key={index} style={{ marginBottom: 4 }}>
+                  <strong>{track.title}</strong> ({track.playlistName})
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    {downloading && <div style={{ margin: '2rem 0', width: '100%', textAlign: 'center', color: '#fff5f5' }}><strong>Large libraries may take a while to download. Please do not refresh the page</strong></div>}
 
     {anyTracksLoading ? (
       <label>
@@ -269,7 +288,7 @@ function App() {
           <li key={pl.id}>
 
               {(loading || anyTracksLoading) ? (
-                <div className="loading-container" aria-label="Loading..."><div style={{ width: '300px', height: '24px' }} className="shimmer"></div></div>
+                <div className="loading-container" aria-label="Loading..."><div style={{ width: '100%', height: '24px' }} className="shimmer"></div></div>
               ) : (
                 <div className="playlist-container">
                 <label>

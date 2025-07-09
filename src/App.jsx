@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import './App.css';
 
+// Use environment variable for API URL, fallback to 127.0.0.1 for development
+const API_BASE_URL = import.meta.env.VITE_API_URL || 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? '' // Use relative URLs for local development (Vite proxy)
+    : window.location.origin); // Use same origin in production
+
 function App() {
   const [authenticated, setAuthenticated] = useState(false);
   const [playlists, setPlaylists] = useState([]);
@@ -17,24 +23,109 @@ function App() {
   const [skippedTracks, setSkippedTracks] = useState([]);
   const [showSkippedTracks, setShowSkippedTracks] = useState(false);
 
+  // Handle auth callback and check authentication status
   useEffect(() => {
-    if (window.location.search.includes('auth=success')) {
-      setAuthenticated(true);
-      window.history.replaceState({}, document.title, '/');
-    }
+    const handleAuthFlow = async () => {
+      // Check if we're on the auth callback route
+      if (window.location.pathname === '/auth/callback') {
+        console.log('🔄 Handling auth callback...');
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const error = urlParams.get('error');
+        
+        if (error) {
+          console.error('❌ OAuth error:', error);
+          setError(`Authentication failed: ${error}`);
+          setLoading(false);
+          window.history.replaceState({}, document.title, '/');
+          return;
+        }
+        
+        if (!code) {
+          console.error('❌ No authorization code received');
+          setError('No authorization code received');
+          setLoading(false);
+          window.history.replaceState({}, document.title, '/');
+          return;
+        }
+        
+        try {
+          console.log('🔐 Exchanging authorization code for tokens...');
+          const response = await axios.post(
+            `${API_BASE_URL}/auth/exchange`, 
+            { code }, 
+            { withCredentials: true }
+          );
+          
+          console.log('✅ Token exchange successful:', response.data);
+          setAuthenticated(true);
+          setLoading(false);
+          
+          // Clean up URL and go to main app
+          window.history.replaceState({}, document.title, '/');
+          
+        } catch (error) {
+          console.error('❌ Token exchange failed:', error);
+          setError('Authentication failed. Please try again.');
+          setAuthenticated(false);
+          setLoading(false);
+          window.history.replaceState({}, document.title, '/');
+        }
+        
+        return; // Don't run normal auth check if we're handling callback
+      }
+      
+      // Normal auth status check
+      try {
+        console.log('🔍 Checking auth status...');
+        console.log('Document cookies:', document.cookie);
+        
+        const response = await axios.get(`${API_BASE_URL}/api/status`, { withCredentials: true });
+        console.log('✅ Auth status response:', response.data);
+        
+        setAuthenticated(response.data.authenticated);
+        setLoading(false);
+        
+        // If we came from old auth callback format, clean up the URL
+        if (window.location.search.includes('auth=success')) {
+          console.log('🔄 Came from legacy auth callback, cleaning up URL');
+          window.history.replaceState({}, document.title, '/');
+        }
+      } catch (error) {
+        console.error('❌ Auth check failed:', error);
+        console.log('Document cookies:', document.cookie);
+        
+        setAuthenticated(false);
+        setLoading(false);
+        
+        // If we came from legacy auth callback but session check failed, show error
+        if (window.location.search.includes('auth=success')) {
+          setError('Authentication failed. Please try logging in again.');
+          window.history.replaceState({}, document.title, '/');
+        }
+      }
+    };
+
+    handleAuthFlow();
   }, []);
 
+  // Fetch playlists when authenticated
   useEffect(() => {
     if (authenticated) {
-      setLoading(true);
-      axios.get(`/api/playlists`, { withCredentials: true })
+      axios.get(`${API_BASE_URL}/api/playlists`, { withCredentials: true })
         .then(res => {
           setPlaylists(res.data.playlists);
-          setLoading(false);
+          setError(''); // Clear any previous errors
         })
-        .catch(() => {
-          setError('Failed to fetch playlists');
-          setLoading(false);
+        .catch((err) => {
+          console.error('Failed to fetch playlists:', err);
+          if (err.response?.status === 401) {
+            setAuthenticated(false);
+            setError('Session expired. Please log in again.');
+          } else {
+            setError('Failed to fetch playlists');
+          }
         });
     }
   }, [authenticated]);
@@ -44,12 +135,18 @@ function App() {
       playlists.forEach(pl => {
         if (!tracks[pl.id] && !loadingTracks[pl.id]) {
           setLoadingTracks(lt => ({ ...lt, [pl.id]: true }));
-          axios.get(`/api/playlists/${pl.id}/tracks`, { withCredentials: true })
+          axios.get(`${API_BASE_URL}/api/playlists/${pl.id}/tracks`, { withCredentials: true })
             .then(res => {
               setTracks(t => ({ ...t, [pl.id]: res.data.tracks }));
             })
-            .catch(() => {
-              setError('Failed to fetch tracks');
+            .catch((err) => {
+              console.error('Failed to fetch tracks for playlist:', pl.id, err);
+              if (err.response?.status === 401) {
+                setAuthenticated(false);
+                setError('Session expired. Please log in again.');
+              } else {
+                setError('Failed to fetch tracks');
+              }
             })
             .finally(() => {
               setLoadingTracks(lt => ({ ...lt, [pl.id]: false }));
@@ -183,7 +280,7 @@ function App() {
         return;
       }
       const res = await axios.post(
-        '/api/download',
+        `${API_BASE_URL}/api/download`,
         { selection, format: fileFormat },
         { responseType: 'blob', withCredentials: true }
       );
@@ -209,7 +306,13 @@ function App() {
         }
       }
     } catch (err) {
-      alert('Failed to download file.');
+      console.error('Download failed:', err);
+      if (err.response?.status === 401) {
+        setAuthenticated(false);
+        setError('Session expired. Please log in again.');
+      } else {
+        alert('Failed to download file. Please try again.');
+      }
     }
     setDownloading(false);
   };

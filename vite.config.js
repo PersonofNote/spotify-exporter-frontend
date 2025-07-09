@@ -5,11 +5,34 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    host: '127.0.0.1',
+    host: '127.0.0.1', // Use 127.0.0.1 instead of localhost for Spotify OAuth
+    port: 5173,
     proxy: {
-      '/api': 'http://127.0.0.1:3001',
-      '/auth': 'http://127.0.0.1:3001',
-      '/debug': 'http://127.0.0.1:3001'
+      '/api': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+        secure: false,
+        headers: {
+          'Access-Control-Allow-Credentials': 'true',
+        }
+      },
+      // Only proxy auth/login and auth/exchange, not auth/callback (handled by frontend)
+      '/auth/login': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+        secure: false,
+        headers: {
+          'Access-Control-Allow-Credentials': 'true',
+        }
+      },
+      '/auth/exchange': {
+        target: 'http://127.0.0.1:3001',
+        changeOrigin: true,
+        secure: false,
+        headers: {
+          'Access-Control-Allow-Credentials': 'true',
+        }
+      }
     }
   }
 })

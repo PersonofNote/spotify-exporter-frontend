@@ -357,37 +357,6 @@ function App() {
           <strong>{numPlaylists} playlists found</strong><br />
           <span>{numSelectedPlaylists} playlists / {numSelectedSongs} songs selected</span>
         </div>
-        {userQuota && (
-          <div className="quota-container" style={{ 
-            margin: '16px 0', 
-            padding: '12px', 
-            border: '1px solid #ddd', 
-            borderRadius: '4px', 
-            backgroundColor: '#f9f9f9',
-            fontSize: '14px'
-          }}>
-            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>Daily Limits</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span>API Calls:</span>
-              <span style={{ color: userQuota.apiCalls >= userQuota.apiLimit * 0.8 ? '#ff6b35' : '#2ecc71' }}>
-                {userQuota.apiCalls} / {userQuota.apiLimit}
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-              <span>Downloads:</span>
-              <span style={{ color: userQuota.downloads >= userQuota.downloadLimit * 0.8 ? '#ff6b35' : '#2ecc71' }}>
-                {userQuota.downloads} / {userQuota.downloadLimit}
-              </span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span>Downloaded Tracks:</span>
-              <span>{userQuota.downloadedTracks.toLocaleString()}</span>
-            </div>
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
-              Limits reset daily at midnight UTC
-            </div>
-          </div>
-        )}
         {anyTracksLoading ? (
           <div className="loading-container" aria-label="Loading..."><div style={{ width: '100%', height: '24px', margin: '16px 0' }} className="shimmer"></div></div>
         ) : (

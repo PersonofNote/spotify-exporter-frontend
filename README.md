@@ -1,12 +1,10 @@
-# React + Vite
+# Spotify Exporter
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+I am moving away from Spotify as a service for several reasons, including personal ethical ones. I don't want to just migrate my music to another equivalent platform. For now, I am downloading my playlists so that I can find the music elsewhere later.
 
-Currently, two official plugins are available:
+## Why make a whole app about it?
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+It was much faster to create a script to download my own music via the command line, but I wanted to expand to a full app for a couple of reasons: 
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+* I see some Reddit comments that others are looking for the same thing. There are existing services that migrate music to another platform, but I don't really want to just swap Spotify for Apple or Youtube Music, and I think I am not alone in this.
+* I'm a software developer and want to keep in practice/beef up my personal portfolio.

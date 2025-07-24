@@ -14,7 +14,7 @@ function App() {
   const [authenticated, setAuthenticated] = useState(false);
   const [playlists, setPlaylists] = useState([]);
   const [selectedPlaylists, setSelectedPlaylists] = useState({});
-  const [tracks, setTracks] = useState({}); // { playlistId: [tracks] }
+  const [tracks, setTracks] = useState({}); // { playlistId: [tracks] } 
   const [selectedTracks, setSelectedTracks] = useState({}); // { playlistId: { trackId: true } }
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -335,7 +335,7 @@ function App() {
       <div className="container">
         <h1>Spotify Playlist Collector</h1>
         <p> Select and download playlist information to .csv, .json, or .txt</p>
-        <a className="login-btn" href={`/auth/login`}>Login with Spotify</a>
+        <a className="login-btn" href={`/auth`}>Login with Spotify</a>
       </div>
     );
   }

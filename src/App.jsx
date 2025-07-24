@@ -335,7 +335,7 @@ function App() {
       <div className="container">
         <h1>Spotify Playlist Collector</h1>
         <p> Select and download playlist information to .csv, .json, or .txt</p>
-        <a className="login-btn" href={`/auth`}>Login with Spotify</a>
+        <a className="login-btn" href={`${API_BASE_URL}/auth`}>Login with Spotify</a>
       </div>
     );
   }

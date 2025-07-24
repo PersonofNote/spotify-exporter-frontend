@@ -22,6 +22,7 @@ function App() {
   const [downloading, setDownloading] = useState(false);
   const [skippedTracks, setSkippedTracks] = useState([]);
   const [showSkippedTracks, setShowSkippedTracks] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [_userQuota, setUserQuota] = useState(null);
   const authFlowHandled = useRef(false);
 
@@ -42,7 +43,6 @@ function App() {
         const error = urlParams.get('error');
         
         if (error) {
-          console.error('❌ OAuth error:', error);
           setError(`Authentication failed: ${error}`);
           setLoading(false);
           window.history.replaceState({}, document.title, '/');
@@ -50,7 +50,6 @@ function App() {
         }
         
         if (!code) {
-          console.error('❌ No authorization code received');
           setError('No authorization code received');
           setLoading(false);
           window.history.replaceState({}, document.title, '/');
@@ -58,14 +57,12 @@ function App() {
         }
         
         try {
-          console.log('🔐 Exchanging authorization code for tokens...');
           const response = await axios.post(
             `${API_BASE_URL}/auth/exchange`, 
             { code }, 
             { withCredentials: true }
           );
           
-          console.log('✅ Token exchange successful:', response.data);
           setAuthenticated(true);
           setUserQuota(response.data.quota);
           setLoading(false);
@@ -77,7 +74,6 @@ function App() {
           }, 100);
           
         } catch (error) {
-          console.error('❌ Token exchange failed:', error);
           setError('Authentication failed. Please try again.');
           setAuthenticated(false);
           setLoading(false);
@@ -89,11 +85,8 @@ function App() {
       
       // Normal auth status check - only run if not handling callback
       try {
-        console.log('🔍 Checking auth status...');
-        console.log('Document cookies:', document.cookie);
         
         const response = await axios.get(`${API_BASE_URL}/api/status`, { withCredentials: true });
-        console.log('✅ Auth status response:', response.data);
         
         setAuthenticated(response.data.authenticated);
         setUserQuota(response.data.quota);
@@ -101,12 +94,9 @@ function App() {
         
         // If we came from old auth callback format, clean up the URL
         if (window.location.search.includes('auth=success')) {
-          console.log('🔄 Came from legacy auth callback, cleaning up URL');
           window.history.replaceState({}, document.title, '/');
         }
       } catch (error) {
-        console.error('❌ Auth check failed:', error);
-        console.log('Document cookies:', document.cookie);
         
         setAuthenticated(false);
         setLoading(false);
@@ -393,7 +383,10 @@ function App() {
         </div>
       )}
     {downloading && <div style={{ margin: '2rem 0', width: '100%', textAlign: 'center', color: '#fff5f5' }}><strong>Large libraries may take a while to download. Please do not refresh the page</strong></div>}
-
+    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '16px', gap: '8px'}}>
+      <button onClick={() => setShowForm(!showForm)}>{showForm ? "Hide form" : "Want to tell me why you're using this tool? (show optional Google form)"}</button>
+      <iframe style={{transition: 'all 200ms'}} src="https://docs.google.com/forms/d/e/1FAIpQLSd7zkECkk_yI6RxsC0dKoHyU-cUK5-KePUS8vVTE2GpG0oehw/viewform?embedded=true" width="640" height={showForm ? '1200' : '0'} frameborder="0" marginheight="0" marginwidth="0">Loading…</iframe>
+    </div>
     {anyTracksLoading ? (
       <label>
         <div className="loading-container" aria-label="Loading..."><div style={{ width: '300px', height: '24px' }} className="shimmer"></div></div>

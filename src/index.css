@@ -73,7 +73,8 @@ button:focus-visible {
   width: 200px;
   text-align: center;
   text-decoration: none;
-  background-color: green;
+  background: #5A87D6;
+  background: linear-gradient(90deg,rgba(90, 135, 214, 1) 35%, rgba(27, 166, 194, 1) 100%);
   justify-content: center;
   color: #fff;
   font-size: 1.2em;
@@ -87,10 +88,10 @@ button:focus-visible {
 }
 
 .login-btn:hover {
-  background-color: darkgreen;
+  background: #5A87D6;
 }
 .login-btn:active {
-  background-color: darkgreen;
+  background-color: darkcyan;
 }
 
 .download-container {

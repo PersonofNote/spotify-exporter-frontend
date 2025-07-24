@@ -6,9 +6,12 @@ const IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ||
-  (IS_LOCAL ? '' : (() => {
+  (IS_LOCAL ? 'http://127.0.0.1:3001' : (() => {
     throw new Error('VITE_API_URL must be defined in production');
   })());
+
+  console.log("BASE URL")
+  console.log(API_BASE_URL)
 
 function App() {
   const [authenticated, setAuthenticated] = useState(false);
@@ -30,52 +33,47 @@ function App() {
 
   // Handle auth callback and check authentication status
   useEffect(() => {
-    if (authFlowHandled.current) return;
-  
-    const handleAuthFlow = async () => {
-      authFlowHandled.current = true;
-  
-      const urlParams = new URLSearchParams(window.location.search);
-      const loginSuccess = urlParams.get('login') === 'success';
-  
-      if (loginSuccess) {
-        try {
-          const response = await axios.get(`${API_BASE_URL}/api/status`, {
-            withCredentials: true,
-          });
-  
-          setAuthenticated(response.data.authenticated);
-          setUserQuota(response.data.quota);
-          setLoading(false);
-  
-          // Clean up URL
-          window.history.replaceState({}, document.title, '/');
-        } catch (error) {
-          setAuthenticated(false);
-          setError('Session check failed after login.');
-          setLoading(false);
-          window.history.replaceState({}, document.title, '/');
-        }
-  
-        return;
-      }
-  
-      // Regular session check
+    const checkSession = async () => {
+      setLoading(true);
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/status`, {
-          withCredentials: true,
-        });
+        const res = await axios.get(`${API_BASE_URL}/api/status`, { withCredentials: true });
+        setAuthenticated(res.data.authenticated);
+        setUserQuota(res.data.quota || null);
   
-        setAuthenticated(response.data.authenticated);
-        setUserQuota(response.data.quota);
-        setLoading(false);
-      } catch (error) {
+        if (res.data.authenticated) {
+          const playlistsRes = await axios.get(`${API_BASE_URL}/api/playlists`, { withCredentials: true });
+          setPlaylists(playlistsRes.data.playlists || []);
+          setUserQuota(playlistsRes.data.quota || null);
+        }
+      } catch (err) {
         setAuthenticated(false);
+        setPlaylists([]);
+        setUserQuota(null);
+      } finally {
         setLoading(false);
       }
     };
   
-    handleAuthFlow();
+    checkSession();
+  }, []);
+  
+
+  useEffect(() => {
+    const handleMessage = async (event) => {
+      if (event.origin !== API_BASE_URL) return; // SECURITY: check origin
+  
+      if (event.data.type === 'spotify-auth-success') {
+        console.log('Login success!', event.data);
+        await fetchStatusAndUpdateUI();
+      } else if (event.data.type === 'spotify-auth-failure') {
+        console.error('Login failed', event.data.error);
+        alert('Spotify login failed: ' + event.data.error);
+      }
+    };
+  
+    window.addEventListener('message', handleMessage);
+  
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
   
 
@@ -112,6 +110,55 @@ function App() {
   }, [playlists]);
 
   const anyTracksLoading = Object.values(loadingTracks).some(Boolean);
+
+  
+
+  const loginWithSpotify = () => {
+    const width = 500;
+    const height = 600;
+    const left = window.screenX + (window.innerWidth - width) / 2;
+    const top = window.screenY + (window.innerHeight - height) / 2;
+  
+    window.open(
+      `${API_BASE_URL}/auth`,
+      'Spotify Login',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+  };
+  
+
+  async function fetchStatusAndUpdateUI() {
+    try {
+      const res = await axios.get(`${API_BASE_URL}/api/status`, { withCredentials: true });
+      const data = res.data;
+  
+      if (data.authenticated) {
+        setAuthenticated(true);
+        setUserQuota(data.quota || null);
+        // Immediately fetch playlists after login success
+        try {
+          const playlistsRes = await axios.get(`${API_BASE_URL}/api/playlists`, { withCredentials: true });
+          setPlaylists(playlistsRes.data.playlists || []);
+          setUserQuota(playlistsRes.data.quota || null);
+          setError('');
+        } catch (err) {
+          console.error('Failed to fetch playlists after login:', err);
+          setError('Failed to fetch playlists after login');
+        }
+      } else {
+        setAuthenticated(false);
+        setPlaylists([]);
+        setUserQuota(null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch auth status:', err);
+      setAuthenticated(false);
+    } finally {
+      setLoading(false);
+    }
+  }
+  
+  
 
   const fetchTracks = (playlistId) => {
     if (tracks[playlistId] || loadingTracks[playlistId]) return;
@@ -158,8 +205,6 @@ function App() {
     setSelectedPlaylists(newSelectedPlaylists);
     setSelectedTracks(newSelectedTracks);
   };
-
-
 
   const handlePlaylistSelect = (playlistId, checked) => {
     setSelectedPlaylists(p => ({ ...p, [playlistId]: checked }));
@@ -300,7 +345,7 @@ function App() {
       <div className="container">
         <h1>Spotify Playlist Collector</h1>
         <p> Select and download playlist information to .csv, .json, or .txt</p>
-        <a className="login-btn" href={`${API_BASE_URL}/auth`}>Login with Spotify</a>
+        <button className="login-btn" onClick={loginWithSpotify}>Login with Spotify</button>
       </div>
     );
   }

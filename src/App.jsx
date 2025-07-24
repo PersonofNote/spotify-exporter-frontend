@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
 
@@ -22,11 +22,17 @@ function App() {
   const [downloading, setDownloading] = useState(false);
   const [skippedTracks, setSkippedTracks] = useState([]);
   const [showSkippedTracks, setShowSkippedTracks] = useState(false);
-  const [userQuota, setUserQuota] = useState(null);
+  const [_userQuota, setUserQuota] = useState(null);
+  const authFlowHandled = useRef(false);
 
   // Handle auth callback and check authentication status
   useEffect(() => {
+    // Prevent double execution in React StrictMode
+    if (authFlowHandled.current) return;
+
     const handleAuthFlow = async () => {
+      authFlowHandled.current = true;
+      
       // Check if we're on the auth callback route
       if (window.location.pathname === '/auth/callback') {
         console.log('🔄 Handling auth callback...');
@@ -61,10 +67,14 @@ function App() {
           
           console.log('✅ Token exchange successful:', response.data);
           setAuthenticated(true);
+          setUserQuota(response.data.quota);
           setLoading(false);
           
-          // Clean up URL and go to main app
-          window.history.replaceState({}, document.title, '/');
+          // Small delay to ensure session cookie is set before navigation
+          setTimeout(() => {
+            // Clean up URL and go to main app
+            window.history.replaceState({}, document.title, '/');
+          }, 100);
           
         } catch (error) {
           console.error('❌ Token exchange failed:', error);
@@ -77,7 +87,7 @@ function App() {
         return; // Don't run normal auth check if we're handling callback
       }
       
-      // Normal auth status check
+      // Normal auth status check - only run if not handling callback
       try {
         console.log('🔍 Checking auth status...');
         console.log('Document cookies:', document.cookie);
@@ -138,34 +148,38 @@ function App() {
   useEffect(() => {
     if (playlists.length > 0) {
       playlists.forEach(pl => {
-        if (!tracks[pl.id] && !loadingTracks[pl.id]) {
-          setLoadingTracks(lt => ({ ...lt, [pl.id]: true }));
-          axios.get(`${API_BASE_URL}/api/playlists/${pl.id}/tracks`, { withCredentials: true })
-            .then(res => {
-              setTracks(t => ({ ...t, [pl.id]: res.data.tracks }));
-              setUserQuota(res.data.quota); // Update quota after API call
-            })
-            .catch((err) => {
-              console.error('Failed to fetch tracks for playlist:', pl.id, err);
-              if (err.response?.status === 401) {
-                setAuthenticated(false);
-                setError('Session expired. Please log in again.');
-              } else if (err.response?.status === 429) {
-                setError(`Rate limit exceeded: ${err.response.data.error}. ${err.response.data.resetTime || 'Try again later.'}`);
-              } else {
-                setError('Failed to fetch tracks');
-              }
-            })
-            .finally(() => {
-              setLoadingTracks(lt => ({ ...lt, [pl.id]: false }));
-            });
-        }
+        fetchTracks(pl.id);
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlists]);
 
   const anyTracksLoading = Object.values(loadingTracks).some(Boolean);
+
+  const fetchTracks = (playlistId) => {
+    if (tracks[playlistId] || loadingTracks[playlistId]) return;
+    
+    setLoadingTracks(lt => ({ ...lt, [playlistId]: true }));
+    axios.get(`${API_BASE_URL}/api/playlists/${playlistId}/tracks`, { withCredentials: true })
+      .then(res => {
+        setTracks(t => ({ ...t, [playlistId]: res.data.tracks }));
+        setUserQuota(res.data.quota);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch tracks for playlist:', playlistId, err);
+        if (err.response?.status === 401) {
+          setAuthenticated(false);
+          setError('Session expired. Please log in again.');
+        } else if (err.response?.status === 429) {
+          setError(`Rate limit exceeded: ${err.response.data.error}. ${err.response.data.resetTime || 'Try again later.'}`);
+        } else {
+          setError('Failed to fetch tracks');
+        }
+      })
+      .finally(() => {
+        setLoadingTracks(lt => ({ ...lt, [playlistId]: false }));
+      });
+  };
 
   const handleSelectAllPlaylists = (checked) => {
     const newSelectedPlaylists = {};
@@ -188,16 +202,7 @@ function App() {
     setSelectedTracks(newSelectedTracks);
   };
 
-  // Select all songs in a playlist
-  const handleSelectAllTracksInPlaylist = (playlistId, checked) => {
-    if (!tracks[playlistId]) return;
-    setSelectedTracks(st => ({
-      ...st,
-      [playlistId]: checked
-        ? Object.fromEntries(tracks[playlistId].map(track => [track.id, true]))
-        : {}
-    }));
-  };
+
 
   const handlePlaylistSelect = (playlistId, checked) => {
     setSelectedPlaylists(p => ({ ...p, [playlistId]: checked }));
@@ -226,12 +231,6 @@ function App() {
   };
 
   const allPlaylistsSelected = playlists.length > 0 && playlists.every(pl => selectedPlaylists[pl.id]);
-  const allTracksSelected = (playlistId) =>
-    tracks[playlistId] && tracks[playlistId].length > 0 &&
-    tracks[playlistId].every(track => selectedTracks[playlistId]?.[track.id]);
-
-  const anyTrackSelected = (playlistId) =>
-    tracks[playlistId] && tracks[playlistId].some(track => selectedTracks[playlistId]?.[track.id]);
 
   useEffect(() => {
     playlists.forEach(pl => {

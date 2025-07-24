@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const backend = process.env.VITE_API_BASE_URL || 'http://127.0.0.1:3001';
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -9,7 +11,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:3001',
+        target: backend,
         changeOrigin: true,
         secure: false,
         headers: {
@@ -18,7 +20,7 @@ export default defineConfig({
       },
       // Only proxy auth/login and auth/exchange, not auth/callback (handled by frontend)
       '/auth/login': {
-        target: 'http://127.0.0.1:3001',
+        target: backend,
         changeOrigin: true,
         secure: false,
         headers: {
@@ -26,7 +28,7 @@ export default defineConfig({
         }
       },
       '/auth/exchange': {
-        target: 'http://127.0.0.1:3001',
+        target: backend,
         changeOrigin: true,
         secure: false,
         headers: {

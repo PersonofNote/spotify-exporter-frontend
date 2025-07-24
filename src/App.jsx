@@ -2,11 +2,13 @@ import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import './App.css';
 
-// Use environment variable for API URL, fallback to 127.0.0.1 for development
-const API_BASE_URL = import.meta.env.VITE_API_URL || 
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
-    ? '' // Use relative URLs for local development (Vite proxy)
-    : window.location.origin); // Use same origin in production
+const IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (IS_LOCAL ? '' : (() => {
+    throw new Error('VITE_API_URL must be defined in production');
+  })());
 
 function App() {
   const [authenticated, setAuthenticated] = useState(false);

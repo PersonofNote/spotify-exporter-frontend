@@ -30,89 +30,54 @@ function App() {
 
   // Handle auth callback and check authentication status
   useEffect(() => {
-    // Prevent double execution in React StrictMode
     if (authFlowHandled.current) return;
-
+  
     const handleAuthFlow = async () => {
       authFlowHandled.current = true;
-      
-      // Check if we're on the auth callback route
-      if (window.location.pathname === '/auth/callback') {
-        console.log('🔄 Handling auth callback...');
-        
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        const error = urlParams.get('error');
-        
-        if (error) {
-          setError(`Authentication failed: ${error}`);
-          setLoading(false);
-          window.history.replaceState({}, document.title, '/');
-          return;
-        }
-        
-        if (!code) {
-          setError('No authorization code received');
-          setLoading(false);
-          window.history.replaceState({}, document.title, '/');
-          return;
-        }
-        
+  
+      const urlParams = new URLSearchParams(window.location.search);
+      const loginSuccess = urlParams.get('login') === 'success';
+  
+      if (loginSuccess) {
         try {
-          const response = await axios.post(
-            `${API_BASE_URL}/auth/exchange`, 
-            { code }, 
-            { withCredentials: true }
-          );
-          
-          setAuthenticated(true);
+          const response = await axios.get(`${API_BASE_URL}/api/status`, {
+            withCredentials: true,
+          });
+  
+          setAuthenticated(response.data.authenticated);
           setUserQuota(response.data.quota);
           setLoading(false);
-          
-          // Small delay to ensure session cookie is set before navigation
-          setTimeout(() => {
-            // Clean up URL and go to main app
-            window.history.replaceState({}, document.title, '/');
-          }, 100);
-          
+  
+          // Clean up URL
+          window.history.replaceState({}, document.title, '/');
         } catch (error) {
-          setError('Authentication failed. Please try again.');
           setAuthenticated(false);
+          setError('Session check failed after login.');
           setLoading(false);
           window.history.replaceState({}, document.title, '/');
         }
-        
-        return; // Don't run normal auth check if we're handling callback
+  
+        return;
       }
-      
-      // Normal auth status check - only run if not handling callback
+  
+      // Regular session check
       try {
-        
-        const response = await axios.get(`${API_BASE_URL}/api/status`, { withCredentials: true });
-        
+        const response = await axios.get(`${API_BASE_URL}/api/status`, {
+          withCredentials: true,
+        });
+  
         setAuthenticated(response.data.authenticated);
         setUserQuota(response.data.quota);
         setLoading(false);
-        
-        // If we came from old auth callback format, clean up the URL
-        if (window.location.search.includes('auth=success')) {
-          window.history.replaceState({}, document.title, '/');
-        }
       } catch (error) {
-        
         setAuthenticated(false);
         setLoading(false);
-        
-        // If we came from legacy auth callback but session check failed, show error
-        if (window.location.search.includes('auth=success')) {
-          setError('Authentication failed. Please try logging in again.');
-          window.history.replaceState({}, document.title, '/');
-        }
       }
     };
-
+  
     handleAuthFlow();
   }, []);
+  
 
   // Fetch playlists when authenticated
   useEffect(() => {

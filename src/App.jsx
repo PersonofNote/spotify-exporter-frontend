@@ -195,12 +195,13 @@ function App() {
 };
 
   async function fetchStatusAndUpdateUI() {
+    console.log("Fetching")
     try {
       const res = await axios.get(`${API_BASE_URL}/api/status`, {
         withCredentials: true,
       });
       const data = res.data;
-
+      console.log("Fetched data:", data);
       if (data.authenticated) {
         setAuthenticated(true);
         setUserQuota(data.quota || null);

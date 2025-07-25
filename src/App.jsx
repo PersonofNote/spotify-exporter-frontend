@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, use } from "react";
 import axios from "axios";
 import "./App.css";
 
@@ -30,6 +30,27 @@ function App() {
   const [_userQuota, setUserQuota] = useState(null);
   const authFlowHandled = useRef(false);
 
+  useEffect(() => {
+    console.log("Setting up message listener for Spotify auth");
+    const handleMessage = async (event) => {
+      console.log("EVENT");
+      console.log(event);
+      if (event.origin !== API_BASE_URL) return; // SECURITY: check origin
+
+      if (event.data.type === "spotify-auth-success") {
+        console.log("Login success!", event.data);
+        await fetchStatusAndUpdateUI();
+      } else if (event.data.type === "spotify-auth-failure") {
+        console.error("Login failed", event.data.error);
+        alert("Spotify login failed: " + event.data.error);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
   // Handle auth callback and check authentication status
   useEffect(() => {
     const checkSession = async () => {
@@ -59,26 +80,6 @@ function App() {
     };
 
     checkSession();
-  }, []);
-
-  useEffect(() => {
-    const handleMessage = async (event) => {
-      console.log("EVENT");
-      console.log(event);
-      if (event.origin !== API_BASE_URL) return; // SECURITY: check origin
-
-      if (event.data.type === "spotify-auth-success") {
-        console.log("Login success!", event.data);
-        await fetchStatusAndUpdateUI();
-      } else if (event.data.type === "spotify-auth-failure") {
-        console.error("Login failed", event.data.error);
-        alert("Spotify login failed: " + event.data.error);
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-
-    return () => window.removeEventListener("message", handleMessage);
   }, []);
 
   // Fetch playlists when authenticated
@@ -126,11 +127,25 @@ function App() {
     const left = window.screenX + (window.innerWidth - width) / 2;
     const top = window.screenY + (window.innerHeight - height) / 2;
 
-    window.open(
+    const popup = window.open(
       `${API_BASE_URL}/auth`,
       "Spotify Login",
       `width=${width},height=${height},left=${left},top=${top}`
     );
+
+    if (!popup) {
+      alert("Please allow popups for this site");
+      return;
+    }
+  
+    // Poll whether the popup is closed, and refresh status
+    const checkPopupClosed = setInterval(async () => {
+      if (popup.closed) {
+        clearInterval(checkPopupClosed);
+        console.log("Popup closed, fetching updated status");
+        await fetchStatusAndUpdateUI();
+      }
+    }, 500);
   };
 
   async function fetchStatusAndUpdateUI() {

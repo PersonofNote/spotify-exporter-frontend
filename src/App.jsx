@@ -128,7 +128,7 @@ function App() {
     const top = window.screenY + (window.innerHeight - height) / 2;
 
     const popup = window.open(
-      `${API_BASE_URL}/auth`,
+      ``,
       "Spotify Login",
       `width=${width},height=${height},left=${left},top=${top}`
     );
@@ -137,8 +137,9 @@ function App() {
       alert("Please allow popups for this site");
       return;
     }
+
+    popup.location.href=`${API_BASE_URL}/auth`;
   
-    // Poll whether the popup is closed, and refresh status
     const checkPopupClosed = setInterval(async () => {
       if (popup.closed) {
         clearInterval(checkPopupClosed);

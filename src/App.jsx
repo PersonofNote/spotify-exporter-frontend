@@ -28,28 +28,6 @@ function App() {
   const [showSkippedTracks, setShowSkippedTracks] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [_userQuota, setUserQuota] = useState(null);
-  const authFlowHandled = useRef(false);
-
-  useEffect(() => {
-    console.log("Setting up message listener for Spotify auth");
-    const handleMessage = async (event) => {
-      console.log("EVENT");
-      console.log(event);
-      if (event.origin !== API_BASE_URL) return; // SECURITY: check origin
-
-      if (event.data.type === "spotify-auth-success") {
-        console.log("Login success!", event.data);
-        await fetchStatusAndUpdateUI();
-      } else if (event.data.type === "spotify-auth-failure") {
-        console.error("Login failed", event.data.error);
-        alert("Spotify login failed: " + event.data.error);
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
 
   // Handle auth callback and check authentication status
   useEffect(() => {
@@ -119,7 +97,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlists]);
 
-  const anyTracksLoading = Object.values(loadingTracks).some(Boolean);
+  const anyTracksLoading = Object.values(loadingTracks).some(Boolean);                                                                                                                                                                                                                                                                                                                                         
 
   const loginWithSpotify = () => {
     const width = 500;
@@ -128,7 +106,7 @@ function App() {
     const top = window.screenY + (window.innerHeight - height) / 2;
 
     const popup = window.open(
-      ``,
+      `${API_BASE_URL}/auth`,
       "Spotify Login",
       `width=${width},height=${height},left=${left},top=${top}`
     );
@@ -138,15 +116,23 @@ function App() {
       return;
     }
 
-    popup.location.href=`${API_BASE_URL}/auth`;
-  
-    const checkPopupClosed = setInterval(async () => {
-      if (popup.closed) {
-        clearInterval(checkPopupClosed);
-        console.log("Popup closed, fetching updated status");
-        await fetchStatusAndUpdateUI();
+    const pollInterval = setInterval(async () => {
+      try {
+        fetchStatusAndUpdateUI();
+        if (authenticated) {
+          console.log("Stop polling")
+          clearInterval(pollInterval);
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
       }
-    }, 500);
+    }, 2000); // Poll every 2 seconds
+    
+    // Cleanup after timeout
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      popup.close();
+    }, 300000); // 5 minutes
   };
 
   async function fetchStatusAndUpdateUI() {

@@ -56,6 +56,7 @@ button {
   transition: border-color 0.25s;
   color: #fff;
 }
+
 button:hover {
   border-color: #646cff;
 }
@@ -64,14 +65,8 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-.login-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  border-radius: 8px;
-  text-align: center;
-  text-decoration: none;
+
+.accent-btn {
   background: #5A87D6;
   background: linear-gradient(90deg,rgba(90, 135, 214, 1) 35%, rgba(27, 166, 194, 1) 100%);
   justify-content: center;
@@ -83,14 +78,17 @@ button:focus-visible {
   transition: border-color 0.25s;
   border: 1px solid transparent;
   border-radius: 8px;
-  margin: auto;
 }
 
-.login-btn:hover {
+.accent-btn:hover {
   background: #5A87D6;
 }
-.login-btn:active {
+.accent-btn:active {
   background-color: darkcyan;
+}
+
+.form-btn {
+  border: 1px solid #5A87D6;
 }
 
 .download-container {
@@ -98,6 +96,7 @@ button:focus-visible {
   display:  flex;
   align-items:  center;
   justify-content: center;
+  gap: 12px;
 }
 
 .download-btn {

@@ -66,7 +66,7 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlists]);
 
-  const anyTracksLoading = Object.values(loadingTracks).some(Boolean);                                                                                                                                                                                                                                                                                                                                         
+  const anyTracksLoading = Object.values(loadingTracks).some(Boolean);
 
   const loginWithSpotify = () => {
     const width = 500;
@@ -89,18 +89,18 @@ function App() {
 
     const pollInterval = setInterval(async () => {
       try {
-        fetchStatusAndUpdateUI();
-        if (authenticated) {
-          console.log("Stop polling")
+        const authResult = await fetchStatusAndUpdateUI();
+        if (authResult.authenticated) {
           clearInterval(pollInterval);
+          clearTimeout(timeout);
         }
       } catch (error) {
-        console.error('Polling error:', error);
+        console.error("Polling error:", error);
       }
-    }, 2000); // Poll every 2 seconds
-    
+    }, 2000);
+
     // Cleanup after timeout
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       clearInterval(pollInterval);
       popup.close();
     }, 300000); // 5 minutes
@@ -129,14 +129,17 @@ function App() {
           console.error("Failed to fetch playlists after login:", err);
           setError("Failed to fetch playlists after login");
         }
+        return { authenticated: true };
       } else {
         setAuthenticated(false);
         setPlaylists([]);
         setUserQuota(null);
+        return { authenticated: false };
       }
     } catch (err) {
       console.error("Failed to fetch auth status:", err);
       setAuthenticated(false);
+      return { authenticated: false };
     } finally {
       setLoading(false);
     }
@@ -360,11 +363,10 @@ function App() {
             ></div>
           </div>
         ) : (
-          <button className="login-btn" onClick={loginWithSpotify}>
+          <button style={{margin: 'auto'}} className="accent-btn" onClick={loginWithSpotify}>
             Login with Spotify
           </button>
         )}
-
       </div>
     );
   }
@@ -402,6 +404,7 @@ function App() {
             </select>
           </label>
           <button
+            className="accent-btn"
             onClick={handleDownload}
             disabled={downloading}
             style={{ marginLeft: 16 }}
@@ -470,7 +473,7 @@ function App() {
           gap: "8px",
         }}
       >
-        <button onClick={() => setShowForm(!showForm)}>
+        <button className='form-btn' onClick={() => setShowForm(!showForm)}>
           {showForm
             ? "Hide form"
             : "Want to tell me why you're using this tool? (show optional Google form)"}

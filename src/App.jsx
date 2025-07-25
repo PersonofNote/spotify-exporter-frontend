@@ -75,7 +75,7 @@ function App() {
                 handleAuthCompletion(authResult);
                 
                 // Clean up localStorage
-                localStorage.removeItem('spotify-auth-result');
+                //localStorage.removeItem('spotify-auth-result');
             } catch (error) {
                 console.error('Error parsing auth result:', error);
             }

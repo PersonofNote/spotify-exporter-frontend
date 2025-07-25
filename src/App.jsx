@@ -60,6 +60,8 @@ function App() {
 
   useEffect(() => {
     const handleMessage = async (event) => {
+      console.log("EVENT")
+      console.log(event)
       if (event.origin !== API_BASE_URL) return; // SECURITY: check origin
   
       if (event.data.type === 'spotify-auth-success') {

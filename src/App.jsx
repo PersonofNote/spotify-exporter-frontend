@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, use } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import "./App.css";
 
@@ -28,6 +28,103 @@ function App() {
   const [showSkippedTracks, setShowSkippedTracks] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [_userQuota, setUserQuota] = useState(null);
+  const [showAuthResult, setShowAuthResult] = useState(false);
+
+  /*
+  useEffect(() => {
+    // Listen for auth completion messages from popup
+    const handleAuthMessage = (event) => {
+      console.log(event)
+      // Verify origin for security
+      if (event.origin !== window.location.origin) {
+        console.warn('Received message from unexpected origin:', event.origin);
+        return;
+      }
+      
+      if (event.data.type === 'SPOTIFY_AUTH_COMPLETE') {
+        console.log('Received auth completion:', event.data);
+        
+        if (event.data.success) {
+          console.log('Authentication successful!');
+          // Refresh auth status to update UI
+          fetchStatusAndUpdateUI();
+        } else {
+          console.log('Authentication failed:', event.data.error);
+          setError(`Authentication failed: ${event.data.error || 'Unknown error'}`);
+          setLoading(false);
+        }
+      }
+    };
+
+    // Add the event listener
+    window.addEventListener('message', handleAuthMessage);
+    
+    // Cleanup on unmount
+    return () => {
+      window.removeEventListener('message', handleAuthMessage);
+    };
+  }, []);
+  */
+  useEffect(() => {
+    // Listen for localStorage changes
+    const handleStorageChange = (event) => {
+        if (event.key === 'spotify-auth-result') {
+            try {
+                const authResult = JSON.parse(event.newValue);
+                console.log('Auth completed:', authResult);
+                handleAuthCompletion(authResult);
+                
+                // Clean up localStorage
+                localStorage.removeItem('spotify-auth-result');
+            } catch (error) {
+                console.error('Error parsing auth result:', error);
+            }
+        }
+    };
+
+    // Handle auth completion
+    const handleAuthCompletion = (data) => {
+        if (data.success) {
+            console.log('Authentication successful!');
+            fetchStatusAndUpdateUI();
+        } else {
+            console.log('Authentication failed:', data.error);
+            setError(`Authentication failed: ${data.error || 'Unknown error'}`);
+            setLoading(false);
+        }
+    };
+
+    // Add storage listener
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Check for existing auth result on mount (in case popup closed before we were listening)
+    const checkExistingAuthResult = () => {
+        const existingResult = localStorage.getItem('spotify-auth-result');
+        if (existingResult) {
+            try {
+                const authResult = JSON.parse(existingResult);
+                // Only process if it's recent (within last 30 seconds)
+                if (Date.now() - authResult.timestamp < 30000) {
+                    console.log('Found existing auth result:', authResult);
+                    handleAuthCompletion(authResult);
+                }
+                localStorage.removeItem('spotify-auth-result');
+            } catch (error) {
+                console.error('Error parsing existing auth result:', error);
+            }
+        }
+    };
+
+    // Check immediately and also after a short delay
+    checkExistingAuthResult();
+    const timeoutId = setTimeout(checkExistingAuthResult, 500);
+    
+    // Cleanup
+    return () => {
+        window.removeEventListener('storage', handleStorageChange);
+        clearTimeout(timeoutId);
+    };
+}, []);
 
   // Fetch playlists when authenticated
   useEffect(() => {
@@ -67,6 +164,7 @@ function App() {
   }, [playlists]);
 
   const anyTracksLoading = Object.values(loadingTracks).some(Boolean);
+  
 
   const loginWithSpotify = () => {
     const width = 500;
@@ -75,36 +173,26 @@ function App() {
     const top = window.screenY + (window.innerHeight - height) / 2;
 
     const popup = window.open(
-      `${API_BASE_URL}/auth`,
-      "Spotify Login",
-      `width=${width},height=${height},left=${left},top=${top}`
+        `${API_BASE_URL}/auth`,
+        "Spotify Login",
+        `width=${width},height=${height},left=${left},top=${top}`
     );
 
     if (!popup) {
-      alert("Please allow popups for this site");
-      return;
+        alert("Please allow popups for this site");
+        return;
     }
 
     setLoading(true);
+    setError("");
 
-    const pollInterval = setInterval(async () => {
-      try {
-        const authResult = await fetchStatusAndUpdateUI();
-        if (authResult.authenticated) {
-          clearInterval(pollInterval);
-          clearTimeout(timeout);
-        }
-      } catch (error) {
-        console.error("Polling error:", error);
-      }
-    }, 2000);
-
-    // Cleanup after timeout
-    const timeout = setTimeout(() => {
-      clearInterval(pollInterval);
-      popup.close();
+    //timeout in case user never completes auth
+    setTimeout(() => {
+        setLoading(false);
+        setError("Authentication timed out. Please try again.");
     }, 300000); // 5 minutes
-  };
+
+};
 
   async function fetchStatusAndUpdateUI() {
     try {

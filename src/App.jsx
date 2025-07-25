@@ -18,7 +18,7 @@ function App() {
   const [selectedPlaylists, setSelectedPlaylists] = useState({});
   const [tracks, setTracks] = useState({}); // { playlistId: [tracks] }
   const [selectedTracks, setSelectedTracks] = useState({}); // { playlistId: { trackId: true } }
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [collapsedPlaylists, setCollapsedPlaylists] = useState({}); // { playlistId: true/false }
   const [loadingTracks, setLoadingTracks] = useState({}); // { playlistId: true/false }
@@ -28,37 +28,6 @@ function App() {
   const [showSkippedTracks, setShowSkippedTracks] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [_userQuota, setUserQuota] = useState(null);
-
-  // Handle auth callback and check authentication status
-  useEffect(() => {
-    const checkSession = async () => {
-      setLoading(true);
-      try {
-        const res = await axios.get(`${API_BASE_URL}/api/status`, {
-          withCredentials: true,
-        });
-        setAuthenticated(res.data.authenticated);
-        setUserQuota(res.data.quota || null);
-
-        if (res.data.authenticated) {
-          const playlistsRes = await axios.get(
-            `${API_BASE_URL}/api/playlists`,
-            { withCredentials: true }
-          );
-          setPlaylists(playlistsRes.data.playlists || []);
-          setUserQuota(playlistsRes.data.quota || null);
-        }
-      } catch (err) {
-        setAuthenticated(false);
-        setPlaylists([]);
-        setUserQuota(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkSession();
-  }, []);
 
   // Fetch playlists when authenticated
   useEffect(() => {
@@ -115,6 +84,8 @@ function App() {
       alert("Please allow popups for this site");
       return;
     }
+
+    setLoading(true);
 
     const pollInterval = setInterval(async () => {
       try {
@@ -381,9 +352,19 @@ function App() {
       <div className="container">
         <h1>Spotify Playlist Collector</h1>
         <p> Select and download playlist information to .csv, .json, or .txt</p>
-        <button className="login-btn" onClick={loginWithSpotify}>
-          Login with Spotify
-        </button>
+        {loading ? (
+          <div className="loading-container" aria-label="Loading...">
+            <div
+              style={{ width: "200px", height: "64px", margin: "auto" }}
+              className="shimmer"
+            ></div>
+          </div>
+        ) : (
+          <button className="login-btn" onClick={loginWithSpotify}>
+            Login with Spotify
+          </button>
+        )}
+
       </div>
     );
   }

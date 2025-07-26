@@ -159,45 +159,70 @@ function App() {
 
 };
 
-  async function fetchStatusAndUpdateUI() {
-    console.log("Fetching")
-    try {
+async function fetchStatusAndUpdateUI(retryCount = 0) {
+  console.log(`Fetching (attempt ${retryCount + 1})`);
+  
+  try {
       const res = await axios.get(`${API_BASE_URL}/api/status`, {
-        withCredentials: true,
+          withCredentials: true,
       });
       const data = res.data;
       console.log("Fetched data:", data);
+      
       if (data.authenticated) {
-        setAuthenticated(true);
-        setUserQuota(data.quota || null);
-        // Immediately fetch playlists after login success
-        try {
-          const playlistsRes = await axios.get(
-            `${API_BASE_URL}/api/playlists`,
-            { withCredentials: true }
-          );
-          setPlaylists(playlistsRes.data.playlists || []);
-          setUserQuota(playlistsRes.data.quota || null);
-          setError("");
-        } catch (err) {
-          console.error("Failed to fetch playlists after login:", err);
-          setError("Failed to fetch playlists after login");
-        }
-        return { authenticated: true };
+          setAuthenticated(true);
+          setUserQuota(data.quota || null);
+          
+          // Fetch playlists
+          try {
+              const playlistsRes = await axios.get(
+                  `${API_BASE_URL}/api/playlists`,
+                  { withCredentials: true }
+              );
+              setPlaylists(playlistsRes.data.playlists || []);
+              setUserQuota(playlistsRes.data.quota || null);
+              setError("");
+          } catch (err) {
+              console.error("Failed to fetch playlists after login:", err);
+              setError("Failed to fetch playlists after login");
+          }
+          return { authenticated: true };
       } else {
-        setAuthenticated(false);
-        setPlaylists([]);
-        setUserQuota(null);
-        return { authenticated: false };
+          // If not authenticated and we haven't retried much, try again
+          if (retryCount < 3) {
+              console.log(`Not authenticated, retrying in ${(retryCount + 1) * 1000}ms...`);
+              setTimeout(() => {
+                  fetchStatusAndUpdateUI(retryCount + 1);
+              }, (retryCount + 1) * 1000); // 1s, 2s, 3s delays
+              return { authenticated: false, retrying: true };
+          } else {
+              console.log('Max retries reached, user not authenticated');
+              setAuthenticated(false);
+              setPlaylists([]);
+              setUserQuota(null);
+              return { authenticated: false };
+          }
       }
-    } catch (err) {
+  } catch (err) {
       console.error("Failed to fetch auth status:", err);
+      
+      // Retry on network errors too
+      if (retryCount < 3) {
+          setTimeout(() => {
+              fetchStatusAndUpdateUI(retryCount + 1);
+          }, (retryCount + 1) * 1000);
+          return { authenticated: false, retrying: true };
+      }
+      
       setAuthenticated(false);
       return { authenticated: false };
-    } finally {
-      setLoading(false);
-    }
+  } finally {
+      // Only set loading to false if we're not retrying
+      if (retryCount >= 3) {
+          setLoading(false);
+      }
   }
+}
 
   const fetchTracks = (playlistId) => {
     if (tracks[playlistId] || loadingTracks[playlistId]) return;

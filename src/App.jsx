@@ -28,43 +28,9 @@ function App() {
   const [showSkippedTracks, setShowSkippedTracks] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [_userQuota, setUserQuota] = useState(null);
-  const [showAuthResult, setShowAuthResult] = useState(false);
 
-  /*
-  useEffect(() => {
-    // Listen for auth completion messages from popup
-    const handleAuthMessage = (event) => {
-      console.log(event)
-      // Verify origin for security
-      if (event.origin !== window.location.origin) {
-        console.warn('Received message from unexpected origin:', event.origin);
-        return;
-      }
-      
-      if (event.data.type === 'SPOTIFY_AUTH_COMPLETE') {
-        console.log('Received auth completion:', event.data);
-        
-        if (event.data.success) {
-          console.log('Authentication successful!');
-          // Refresh auth status to update UI
-          fetchStatusAndUpdateUI();
-        } else {
-          console.log('Authentication failed:', event.data.error);
-          setError(`Authentication failed: ${event.data.error || 'Unknown error'}`);
-          setLoading(false);
-        }
-      }
-    };
 
-    // Add the event listener
-    window.addEventListener('message', handleAuthMessage);
-    
-    // Cleanup on unmount
-    return () => {
-      window.removeEventListener('message', handleAuthMessage);
-    };
-  }, []);
-  */
+  useEffect(() => {console.log( "Authenticated?: ", authenticated)}, [authenticated]);
   useEffect(() => {
     // Listen for localStorage changes
     const handleStorageChange = (event) => {

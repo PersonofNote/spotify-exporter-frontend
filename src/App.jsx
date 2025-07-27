@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { tokenManager, setupAxiosInterceptors } from "./auth.js";
 import "./App.css";
 
 const IS_LOCAL = ["localhost", "127.0.0.1"].includes(window.location.hostname);
@@ -11,6 +12,9 @@ const API_BASE_URL =
     : (() => {
         throw new Error("VITE_API_URL must be defined in production");
       })());
+
+// Setup axios interceptors for JWT
+setupAxiosInterceptors(axios);
 
 function App() {
   const [authenticated, setAuthenticated] = useState(false);
@@ -30,9 +34,14 @@ function App() {
   const [_userQuota, setUserQuota] = useState(null);
 
 
-  useEffect(() => {console.log( "Authenticated?: ", authenticated)}, [authenticated]);
+  // Check authentication status on mount
   useEffect(() => {
-    // Listen for localStorage changes
+    // Check if we have a valid token
+    if (tokenManager.hasToken()) {
+      setAuthenticated(true);
+    }
+
+    // Listen for localStorage changes (auth popup completion)
     const handleStorageChange = (event) => {
         if (event.key === 'spotify-auth-result') {
             try {
@@ -50,9 +59,12 @@ function App() {
 
     // Handle auth completion
     const handleAuthCompletion = (data) => {
-        if (data.success) {
+        if (data.success && data.token) {
             console.log('Authentication successful!');
-            fetchStatusAndUpdateUI();
+            tokenManager.setToken(data.token);
+            setAuthenticated(true);
+            setError("");
+            setLoading(false);
         } else {
             console.log('Authentication failed:', data.error);
             setError(`Authentication failed: ${data.error || 'Unknown error'}`);
@@ -60,8 +72,17 @@ function App() {
         }
     };
 
-    // Add storage listener
+    // Listen for token expiration
+    const handleAuthExpired = () => {
+        setAuthenticated(false);
+        setPlaylists([]);
+        setUserQuota(null);
+        setError("Your session has expired. Please log in again.");
+    };
+
+    // Add event listeners
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('auth-expired', handleAuthExpired);
     
     // Check for existing auth result on mount (in case popup closed before we were listening)
     const checkExistingAuthResult = () => {
@@ -88,15 +109,16 @@ function App() {
     // Cleanup
     return () => {
         window.removeEventListener('storage', handleStorageChange);
+        window.removeEventListener('auth-expired', handleAuthExpired);
         clearTimeout(timeoutId);
     };
 }, []);
 
   // Fetch playlists when authenticated
   useEffect(() => {
-    if (authenticated) {
+    if (authenticated && tokenManager.hasToken()) {
       axios
-        .get(`${API_BASE_URL}/api/playlists`, { withCredentials: true })
+        .get(`${API_BASE_URL}/api/playlists`)
         .then((res) => {
           setPlaylists(res.data.playlists);
           setUserQuota(res.data.quota); // Update quota after API call
@@ -106,7 +128,8 @@ function App() {
           console.error("Failed to fetch playlists:", err);
           if (err.response?.status === 401) {
             setAuthenticated(false);
-            setError("Session expired. Please log in again.");
+            tokenManager.removeToken();
+            setError("Your session has expired. Please log in again.");
           } else if (err.response?.status === 429) {
             setError(
               `Rate limit exceeded: ${err.response.data.error}. ${
@@ -159,79 +182,23 @@ function App() {
 
 };
 
-async function fetchStatusAndUpdateUI(retryCount = 0) {
-  console.log(`Fetching (attempt ${retryCount + 1})`);
-  
-  try {
-      const res = await axios.get(`${API_BASE_URL}/api/status`, {
-          withCredentials: true,
-      });
-      const data = res.data;
-      console.log("Fetched data:", data);
-      
-      if (data.authenticated) {
-          setAuthenticated(true);
-          setUserQuota(data.quota || null);
-          
-          // Fetch playlists
-          try {
-              const playlistsRes = await axios.get(
-                  `${API_BASE_URL}/api/playlists`,
-                  { withCredentials: true }
-              );
-              setPlaylists(playlistsRes.data.playlists || []);
-              setUserQuota(playlistsRes.data.quota || null);
-              setError("");
-          } catch (err) {
-              console.error("Failed to fetch playlists after login:", err);
-              setError("Failed to fetch playlists after login");
-          }
-          return { authenticated: true };
-      } else {
-          // If not authenticated and we haven't retried much, try again
-          if (retryCount < 3) {
-              console.log(`Not authenticated, retrying in ${(retryCount + 1) * 1000}ms...`);
-              setTimeout(() => {
-                  fetchStatusAndUpdateUI(retryCount + 1);
-              }, (retryCount + 1) * 1000); // 1s, 2s, 3s delays
-              return { authenticated: false, retrying: true };
-          } else {
-              console.log('Max retries reached, user not authenticated');
-              setAuthenticated(false);
-              setPlaylists([]);
-              setUserQuota(null);
-              return { authenticated: false };
-          }
-      }
-  } catch (err) {
-      console.error("Failed to fetch auth status:", err);
-      
-      // Retry on network errors too
-      if (retryCount < 3) {
-          setTimeout(() => {
-              fetchStatusAndUpdateUI(retryCount + 1);
-          }, (retryCount + 1) * 1000);
-          return { authenticated: false, retrying: true };
-      }
-      
-      setAuthenticated(false);
-      return { authenticated: false };
-  } finally {
-      // Only set loading to false if we're not retrying
-      if (retryCount >= 3) {
-          setLoading(false);
-      }
-  }
-}
+  const logout = () => {
+    tokenManager.removeToken();
+    setAuthenticated(false);
+    setPlaylists([]);
+    setUserQuota(null);
+    setSelectedPlaylists({});
+    setSelectedTracks({});
+    setTracks({});
+    setError("");
+  };
 
   const fetchTracks = (playlistId) => {
     if (tracks[playlistId] || loadingTracks[playlistId]) return;
 
     setLoadingTracks((lt) => ({ ...lt, [playlistId]: true }));
     axios
-      .get(`${API_BASE_URL}/api/playlists/${playlistId}/tracks`, {
-        withCredentials: true,
-      })
+      .get(`${API_BASE_URL}/api/playlists/${playlistId}/tracks`)
       .then((res) => {
         setTracks((t) => ({ ...t, [playlistId]: res.data.tracks }));
         setUserQuota(res.data.quota);
@@ -240,7 +207,8 @@ async function fetchStatusAndUpdateUI(retryCount = 0) {
         console.error("Failed to fetch tracks for playlist:", playlistId, err);
         if (err.response?.status === 401) {
           setAuthenticated(false);
-          setError("Session expired. Please log in again.");
+          tokenManager.removeToken();
+          setError("Your session has expired. Please log in again.");
         } else if (err.response?.status === 429) {
           setError(
             `Rate limit exceeded: ${err.response.data.error}. ${
@@ -378,7 +346,7 @@ async function fetchStatusAndUpdateUI(retryCount = 0) {
       const res = await axios.post(
         `${API_BASE_URL}/api/download`,
         { selection, format: fileFormat },
-        { responseType: "blob", withCredentials: true }
+        { responseType: "blob" }
       );
       const url = window.URL.createObjectURL(new Blob([res.data]));
       const a = document.createElement("a");
@@ -416,7 +384,8 @@ async function fetchStatusAndUpdateUI(retryCount = 0) {
       console.error("Download failed:", err);
       if (err.response?.status === 401) {
         setAuthenticated(false);
-        setError("Session expired. Please log in again.");
+        tokenManager.removeToken();
+        setError("Your session has expired. Please log in again.");
       } else if (err.response?.status === 429) {
         const errorData = err.response.data;
         alert(
@@ -452,7 +421,22 @@ async function fetchStatusAndUpdateUI(retryCount = 0) {
 
   return (
     <div className="container">
-      <h1>Spotify Playlist Collector</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <h1>Spotify Playlist Collector</h1>
+        <button 
+          onClick={logout}
+          style={{ 
+            padding: '8px 16px', 
+            backgroundColor: '#dc3545', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          Logout
+        </button>
+      </div>
       {error && <p style={{ color: "red" }}>{error}</p>}
       <div className="info-container">
         <strong>{numPlaylists} playlists found</strong>
@@ -460,6 +444,11 @@ async function fetchStatusAndUpdateUI(retryCount = 0) {
         <span>
           {numSelectedPlaylists} playlists / {numSelectedSongs} songs selected
         </span>
+        {tokenManager.hasToken() && (
+          <div style={{ fontSize: '0.9em', color: '#666', marginTop: '0.5rem' }}>
+            Logged in as: {tokenManager.getUserId()}
+          </div>
+        )}
       </div>
       {anyTracksLoading ? (
         <div className="loading-container" aria-label="Loading...">

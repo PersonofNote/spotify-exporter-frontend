@@ -58,25 +58,34 @@
       const urlParams = new URLSearchParams(window.location.search);
       const success = urlParams.get("success");
       const error = urlParams.get("error");
-      console.log("TESTING:");
+      const token = urlParams.get("token");
+      const userId = urlParams.get("userId");
+      
+      console.log("Auth callback received:");
       console.log("Success:", success);
+      console.log("Token:", token ? "Present" : "Missing");
+      console.log("UserId:", userId);
+      
       const messageData = {
         type: "SPOTIFY_AUTH_COMPLETE",
         success: success === "true",
         error: error,
+        token: token,
+        userId: userId
       };
-        console.log("Setting local storage: ", messageData);
-        localStorage.setItem(
-          "spotify-auth-result",
-          JSON.stringify({
-            ...messageData,
-            timestamp: Date.now(),
-          })
-        );
-        setTimeout(() => {
-          window.close();
-        }, 100);
       
+      console.log("Setting local storage:", messageData);
+      localStorage.setItem(
+        "spotify-auth-result",
+        JSON.stringify({
+          ...messageData,
+          timestamp: Date.now(),
+        })
+      );
+      
+      setTimeout(() => {
+        window.close();
+      }, 100);
     </script>
   </body>
 </html>

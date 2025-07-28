@@ -32,6 +32,14 @@ function App() {
   const [showSkippedTracks, setShowSkippedTracks] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [_userQuota, setUserQuota] = useState(null);
+  
+  // Public playlist state
+  const [playlistUrl, setPlaylistUrl] = useState("");
+  const [publicPlaylist, setPublicPlaylist] = useState(null);
+  const [publicTracks, setPublicTracks] = useState([]);
+  const [selectedPublicTracks, setSelectedPublicTracks] = useState({});
+  const [fetchingPublicPlaylist, setFetchingPublicPlaylist] = useState(false);
+  const [publicPlaylistError, setPublicPlaylistError] = useState("");
 
   // Check authentication status on mount
   useEffect(() => {
@@ -178,6 +186,108 @@ function App() {
     setSelectedTracks({});
     setTracks({});
     setError("");
+  };
+
+  // Public playlist functions
+  const handleFetchPublicPlaylist = async () => {
+    if (!playlistUrl.trim()) {
+      setPublicPlaylistError("Please enter a playlist URL");
+      return;
+    }
+
+    setFetchingPublicPlaylist(true);
+    setPublicPlaylistError("");
+    setPublicPlaylist(null);
+    setPublicTracks([]);
+    setSelectedPublicTracks({});
+
+    try {
+      const response = await axios.post(`${API_BASE_URL}/api/public-playlist`, {
+        playlistUrl: playlistUrl.trim()
+      });
+
+      setPublicPlaylist(response.data.playlist);
+      setPublicTracks(response.data.tracks);
+      
+      // Auto-select all tracks
+      const allSelected = {};
+      response.data.tracks.forEach(track => {
+        allSelected[track.id] = true;
+      });
+      setSelectedPublicTracks(allSelected);
+
+    } catch (err) {
+      console.error("Failed to fetch public playlist:", err);
+      setPublicPlaylistError(
+        err.response?.data?.error || "Failed to fetch playlist. Please try again."
+      );
+    } finally {
+      setFetchingPublicPlaylist(false);
+    }
+  };
+
+  const handlePublicTrackSelect = (trackId, checked) => {
+    setSelectedPublicTracks(prev => ({
+      ...prev,
+      [trackId]: checked
+    }));
+  };
+
+  const handleSelectAllPublicTracks = (checked) => {
+    const newSelection = {};
+    publicTracks.forEach(track => {
+      newSelection[track.id] = checked;
+    });
+    setSelectedPublicTracks(newSelection);
+  };
+
+  const handlePublicPlaylistDownload = async () => {
+    const selectedTrackIds = Object.keys(selectedPublicTracks).filter(
+      trackId => selectedPublicTracks[trackId]
+    );
+
+    if (selectedTrackIds.length === 0) {
+      alert("Please select at least one track to download.");
+      return;
+    }
+
+    setDownloading(true);
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/public-playlist/download`,
+        {
+          playlistUrl: playlistUrl.trim(),
+          selectedTrackIds,
+          format: fileFormat
+        },
+        { responseType: "blob" }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `spotify_public_playlist.${fileFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+    } catch (err) {
+      console.error("Download failed:", err);
+      alert(
+        err.response?.data?.error || "Failed to download file. Please try again."
+      );
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const clearPublicPlaylist = () => {
+    setPlaylistUrl("");
+    setPublicPlaylist(null);
+    setPublicTracks([]);
+    setSelectedPublicTracks({});
+    setPublicPlaylistError("");
   };
 
   const fetchTracks = (playlistId) => {
@@ -389,7 +499,8 @@ function App() {
     return (
       <div className="container">
         <h1>Spotify Playlist Collector</h1>
-        <p> Select and download playlist information to .csv, .json, or .txt</p>
+        <p>Select and download playlist information to .csv, .json, or .txt</p>
+        
         {loading ? (
           <div className="loading-container" aria-label="Loading...">
             <div
@@ -398,13 +509,163 @@ function App() {
             ></div>
           </div>
         ) : (
-          <button
-            style={{ margin: "auto" }}
-            className="accent-btn"
-            onClick={loginWithSpotify}
-          >
-            Login with Spotify
-          </button>
+          <>
+            <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+              <button style={{margin: 'auto'}} className="accent-btn" onClick={loginWithSpotify}>
+                Login with Spotify
+              </button>
+              <p style={{ margin: '1rem 0', color: '#d3d3d3' }}>
+                Login to access all your playlists
+              </p>
+            </div>
+
+            <div style={{ 
+              borderTop: '1px solid #ddd', 
+              paddingTop: '2rem', 
+              marginTop: '2rem' 
+            }}>
+              <h3 style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                Or try a public playlist
+              </h3>
+              <p style={{ textAlign: 'center', color: '#d3d3d3', marginBottom: '1rem' }}>
+                Paste a link to any public Spotify playlist to view and download its tracks
+              </p>
+              
+              <div style={{ 
+                display: 'flex', 
+                gap: '0.5rem', 
+                marginBottom: '1rem',
+                flexWrap: 'wrap'
+              }}>
+                <input
+                  type="text"
+                  placeholder="https://open.spotify.com/playlist/..."
+                  value={playlistUrl}
+                  onChange={(e) => setPlaylistUrl(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleFetchPublicPlaylist()}
+                  style={{
+                    flex: 1,
+                    minWidth: '300px',
+                    padding: '0.5rem',
+                    border: '1px solid #ddd',
+                    borderRadius: '4px',
+                    fontSize: '14px'
+                  }}
+                  disabled={fetchingPublicPlaylist}
+                />
+                <button
+                  onClick={handleFetchPublicPlaylist}
+                  disabled={fetchingPublicPlaylist || !playlistUrl.trim()}
+                  className="accent-btn"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {fetchingPublicPlaylist ? 'Fetching...' : 'Fetch Playlist'}
+                </button>
+                {publicPlaylist && (
+                  <button
+                    onClick={clearPublicPlaylist}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: '#dc3545',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {publicPlaylistError && (
+                <p style={{ color: 'red', textAlign: 'center', marginBottom: '1rem' }}>
+                  {publicPlaylistError}
+                </p>
+              )}
+
+              {publicPlaylist && (
+                <div>
+                  <div style={{ 
+                    padding: '1rem', 
+                    borderRadius: '4px', 
+                    marginBottom: '1rem' 
+                  }}>
+                    <h4 style={{ margin: '0 0 0.5rem 0' }}>{publicPlaylist.name}</h4>
+                    <p style={{ margin: '0', color: '#666', fontSize: '14px' }}>
+                      By {publicPlaylist.owner} • {publicPlaylist.trackCount} tracks
+                    </p>
+                    {publicPlaylist.description && (
+                      <p style={{ margin: '0.5rem 0 0 0', fontSize: '14px' }}>
+                        {publicPlaylist.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="donwload-container" style={{display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', marginBottom: '1rem'}}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={publicTracks.length > 0 && publicTracks.every(track => selectedPublicTracks[track.id])}
+                          onChange={(e) => handleSelectAllPublicTracks(e.target.checked)}
+                        />
+                        Select/Deselect All Tracks ({Object.values(selectedPublicTracks).filter(Boolean).length} of {publicTracks.length} selected)
+                      </label>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                      <label>
+                        File format:
+                        <select
+                          value={fileFormat}
+                          onChange={(e) => setFileFormat(e.target.value)}
+                          style={{ marginLeft: '0.5rem' }}
+                        >
+                          <option value="csv">CSV</option>
+                          <option value="json">JSON</option>
+                          <option value="txt">TXT</option>
+                        </select>
+                      </label>
+                      <button
+                        onClick={handlePublicPlaylistDownload}
+                        disabled={downloading || Object.values(selectedPublicTracks).filter(Boolean).length === 0}
+                        className="accent-btn"
+                      >
+                        {downloading ? 'Preparing...' : 'Download Selected'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ maxHeight: '400px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '4px' }}>
+                    <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                      {publicTracks.map((track, index) => (
+                        <li 
+                          key={track.id} 
+                          style={{ 
+                            padding: '0.5rem', 
+                            backgroundColor: selectedPublicTracks[track.id] ? '#222222' : 'transparent'
+                          }}
+                        >
+                          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                            <input
+                              type="checkbox"
+                              checked={!!selectedPublicTracks[track.id]}
+                              onChange={(e) => handlePublicTrackSelect(track.id, e.target.checked)}
+                              style={{ marginRight: '0.5rem' }}
+                            />
+                            <span>
+                              <strong>{track.title}</strong> – {track.artists.join(', ')}
+                            </span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
     );

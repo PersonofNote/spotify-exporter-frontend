@@ -32,6 +32,11 @@ ul {
   text-align: left;
 }
 
+.container {
+  padding-bottom: 6rem;
+  max-width: 1280px;
+}
+
 .playlist-list {
   list-style-type: none;
   padding: 0;
@@ -63,6 +68,14 @@ button:hover {
 button:focus,
 button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 16px;
+  color: #fff;
 }
 
 
@@ -97,6 +110,7 @@ button:focus-visible {
   align-items:  center;
   justify-content: center;
   gap: 12px;
+  flex-direction: column;
 }
 
 .download-btn {
@@ -181,3 +195,15 @@ label {
   }
 }
 
+
+@media (min-width: 760px) {
+  .container {
+    width: 70%;
+    margin: auto;
+  }
+
+  .download-container {
+    flex-direction: row;
+    justify-content: center;
+  }
+}

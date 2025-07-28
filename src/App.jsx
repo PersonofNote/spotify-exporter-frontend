@@ -33,7 +33,6 @@ function App() {
   const [showForm, setShowForm] = useState(false);
   const [_userQuota, setUserQuota] = useState(null);
 
-
   // Check authentication status on mount
   useEffect(() => {
     // Check if we have a valid token
@@ -43,76 +42,72 @@ function App() {
 
     // Listen for localStorage changes (auth popup completion)
     const handleStorageChange = (event) => {
-        if (event.key === 'spotify-auth-result') {
-            try {
-                const authResult = JSON.parse(event.newValue);
-                console.log('Auth completed:', authResult);
-                handleAuthCompletion(authResult);
-                
-                // Clean up localStorage
-                localStorage.removeItem('spotify-auth-result');
-            } catch (error) {
-                console.error('Error parsing auth result:', error);
-            }
+      if (event.key === "spotify-auth-result") {
+        try {
+          const authResult = JSON.parse(event.newValue);
+          handleAuthCompletion(authResult);
+
+          // Clean up localStorage
+          localStorage.removeItem("spotify-auth-result");
+        } catch (error) {
+          console.error("Error parsing auth result:", error);
         }
+      }
     };
 
     // Handle auth completion
     const handleAuthCompletion = (data) => {
-        if (data.success && data.token) {
-            console.log('Authentication successful!');
-            tokenManager.setToken(data.token);
-            setAuthenticated(true);
-            setError("");
-            setLoading(false);
-        } else {
-            console.log('Authentication failed:', data.error);
-            setError(`Authentication failed: ${data.error || 'Unknown error'}`);
-            setLoading(false);
-        }
+      if (data.success && data.token) {
+        tokenManager.setToken(data.token);
+        setAuthenticated(true);
+        setError("");
+        setLoading(false);
+      } else {
+        setError(`Authentication failed: ${data.error || "Unknown error"}`);
+        setLoading(false);
+      }
     };
 
     // Listen for token expiration
     const handleAuthExpired = () => {
-        setAuthenticated(false);
-        setPlaylists([]);
-        setUserQuota(null);
-        setError("Your session has expired. Please log in again.");
+      setAuthenticated(false);
+      setPlaylists([]);
+      setUserQuota(null);
+      setError("Your session has expired. Please log in again.");
     };
 
     // Add event listeners
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('auth-expired', handleAuthExpired);
-    
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("auth-expired", handleAuthExpired);
+
     // Check for existing auth result on mount (in case popup closed before we were listening)
     const checkExistingAuthResult = () => {
-        const existingResult = localStorage.getItem('spotify-auth-result');
-        if (existingResult) {
-            try {
-                const authResult = JSON.parse(existingResult);
-                // Only process if it's recent (within last 30 seconds)
-                if (Date.now() - authResult.timestamp < 30000) {
-                    console.log('Found existing auth result:', authResult);
-                    handleAuthCompletion(authResult);
-                }
-                localStorage.removeItem('spotify-auth-result');
-            } catch (error) {
-                console.error('Error parsing existing auth result:', error);
-            }
+      const existingResult = localStorage.getItem("spotify-auth-result");
+      if (existingResult) {
+        try {
+          const authResult = JSON.parse(existingResult);
+          // Only process if it's recent (within last 30 seconds)
+          if (Date.now() - authResult.timestamp < 30000) {
+            handleAuthCompletion(authResult);
+          }
+          localStorage.removeItem("spotify-auth-result");
+        } catch (error) {
+          console.error("Error parsing existing auth result");
         }
+      }
     };
 
     // Check immediately and also after a short delay
     checkExistingAuthResult();
     const timeoutId = setTimeout(checkExistingAuthResult, 500);
-    
+
     // Cleanup
     return () => {
-        window.removeEventListener('storage', handleStorageChange);
-        window.removeEventListener('auth-expired', handleAuthExpired);
-        clearTimeout(timeoutId);
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("auth-expired", handleAuthExpired);
+      clearTimeout(timeoutId);
     };
-}, []);
+  }, []);
 
   // Fetch playlists when authenticated
   useEffect(() => {
@@ -132,7 +127,7 @@ function App() {
             setError("Your session has expired. Please log in again.");
           } else if (err.response?.status === 429) {
             setError(
-              `Rate limit exceeded: ${err.response.data.error}. ${
+              `Rate limit exceeded. Some or all songs were not fetched. ${
                 err.response.data.resetTime || "Try again later."
               }`
             );
@@ -153,7 +148,6 @@ function App() {
   }, [playlists]);
 
   const anyTracksLoading = Object.values(loadingTracks).some(Boolean);
-  
 
   const loginWithSpotify = () => {
     const width = 500;
@@ -162,25 +156,18 @@ function App() {
     const top = window.screenY + (window.innerHeight - height) / 2;
 
     const popup = window.open(
-        `${API_BASE_URL}/auth`,
-        "Spotify Login",
-        `width=${width},height=${height},left=${left},top=${top}`
+      `${API_BASE_URL}/auth`,
+      "Spotify Login",
+      `width=${width},height=${height},left=${left},top=${top}`
     );
 
     if (!popup) {
-        alert("Please allow popups for this site");
-        return;
+      alert("Please allow popups for this site");
+      return;
     }
 
     setError("");
-
-    //timeout in case user never completes auth
-    setTimeout(() => {
-        setLoading(false);
-        setError("Authentication timed out. Please try again.");
-    }, 300000); // 5 minutes
-
-};
+  };
 
   const logout = () => {
     tokenManager.removeToken();
@@ -211,7 +198,7 @@ function App() {
           setError("Your session has expired. Please log in again.");
         } else if (err.response?.status === 429) {
           setError(
-            `Rate limit exceeded: ${err.response.data.error}. ${
+            `Rate limit exceeded: Some or all songs were not fetched. ${
               err.response.data.resetTime || "Try again later."
             }`
           );
@@ -411,7 +398,11 @@ function App() {
             ></div>
           </div>
         ) : (
-          <button style={{margin: 'auto'}} className="accent-btn" onClick={loginWithSpotify}>
+          <button
+            style={{ margin: "auto" }}
+            className="accent-btn"
+            onClick={loginWithSpotify}
+          >
             Login with Spotify
           </button>
         )}
@@ -420,232 +411,240 @@ function App() {
   }
 
   return (
-    <div className="container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h1>Spotify Playlist Collector</h1>
-        <button 
+    <>
+      <div className="header">
+        <button
           onClick={logout}
-          style={{ 
-            padding: '8px 16px', 
-            backgroundColor: '#dc3545', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '4px',
-            cursor: 'pointer'
+          style={{
+            padding: "8px 16px",
+            backgroundColor: "#dc3545",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer"
           }}
         >
           Logout
         </button>
       </div>
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      <div className="info-container">
-        <strong>{numPlaylists} playlists found</strong>
-        <br />
-        <span>
-          {numSelectedPlaylists} playlists / {numSelectedSongs} songs selected
-        </span>
-        {tokenManager.hasToken() && (
-          <div style={{ fontSize: '0.9em', color: '#666', marginTop: '0.5rem' }}>
-            Logged in as: {tokenManager.getUserId()}
-          </div>
-        )}
-      </div>
-      {anyTracksLoading ? (
-        <div className="loading-container" aria-label="Loading...">
-          <div
-            style={{ width: "100%", height: "24px", margin: "16px 0" }}
-            className="shimmer"
-          ></div>
+      <div className="container">
+          <h1>Spotify Playlist Collector</h1>
+        {error && <p style={{ color: "#dc3545" }}>{error}</p>}
+        <div className="info-container">
+          <strong>{numPlaylists} playlists found</strong>
+          <br />
+          <span>
+            {numSelectedPlaylists} playlists / {numSelectedSongs} songs selected
+          </span>
         </div>
-      ) : (
-        <div className="download-container">
-          <label>
-            File format:
-            <select
-              value={fileFormat}
-              onChange={(e) => setFileFormat(e.target.value)}
-              style={{ marginLeft: 8 }}
-            >
-              <option value="csv">CSV</option>
-              <option value="json">JSON</option>
-              <option value="txt">TXT</option>
-            </select>
-          </label>
-          <button
-            className="accent-btn"
-            onClick={handleDownload}
-            disabled={downloading}
-            style={{ marginLeft: 16 }}
-          >
-            {downloading ? "Preparing..." : "Download"}
-          </button>
-        </div>
-      )}
-      {skippedTracks.length > 0 && (
-        <div
-          style={{
-            margin: "16px 0",
-            padding: 12,
-            border: "1px solid #ff6b6b",
-            borderRadius: 4,
-            backgroundColor: "#fff5f5",
-          }}
-        >
-          <div
-            style={{ cursor: "pointer", fontWeight: "bold", color: "#d63031" }}
-            onClick={() => setShowSkippedTracks(!showSkippedTracks)}
-          >
-            {skippedTracks.length} track{skippedTracks.length !== 1 ? "s" : ""}{" "}
-            weren't able to be processed: {showSkippedTracks ? "▼" : "▶"} Show
-            list
-          </div>
-          {showSkippedTracks && (
-            <ul
-              style={{
-                marginTop: 8,
-                marginBottom: 0,
-                paddingLeft: 20,
-                color: "#d63031",
-              }}
-            >
-              {skippedTracks.map((track, index) => (
-                <li key={index} style={{ marginBottom: 4 }}>
-                  <strong>{track.title}</strong> ({track.playlistName})
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-      {downloading && (
-        <div
-          style={{
-            margin: "2rem 0",
-            width: "100%",
-            textAlign: "center",
-            color: "#fff5f5",
-          }}
-        >
-          <strong>
-            Large libraries may take a while to download. Please do not refresh
-            the page
-          </strong>
-        </div>
-      )}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          marginBottom: "16px",
-          gap: "8px",
-        }}
-      >
-        <button className='form-btn' onClick={() => setShowForm(!showForm)}>
-          {showForm
-            ? "Hide form"
-            : "Want to tell me why you're using this tool? (show optional Google form)"}
-        </button>
-        <iframe
-          style={{ transition: "all 200ms" }}
-          src="https://docs.google.com/forms/d/e/1FAIpQLSd7zkECkk_yI6RxsC0dKoHyU-cUK5-KePUS8vVTE2GpG0oehw/viewform?embedded=true"
-          width="640"
-          height={showForm ? "1200" : "0"}
-          frameBorder="0"
-          marginHeight="0"
-          marginWidth="0"
-        >
-          Loading…
-        </iframe>
-      </div>
-      {anyTracksLoading ? (
-        <label>
+        {anyTracksLoading ? (
           <div className="loading-container" aria-label="Loading...">
             <div
-              style={{ width: "300px", height: "24px" }}
+              style={{ width: "100%", height: "24px", margin: "16px 0" }}
               className="shimmer"
             ></div>
           </div>
-        </label>
-      ) : (
-        <label>
-          <input
-            type="checkbox"
-            checked={allPlaylistsSelected}
-            onChange={(e) => handleSelectAllPlaylists(e.target.checked)}
-          />
-          Select All Playlists and Songs
-        </label>
-      )}
-      <ul>
-        {playlists.map((pl) => (
-          <li key={pl.id}>
-            {loading || anyTracksLoading ? (
-              <div className="loading-container" aria-label="Loading...">
-                <div
-                  style={{ width: "100%", height: "24px" }}
-                  className="shimmer"
-                ></div>
-              </div>
-            ) : (
-              <div className="playlist-container">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={!!selectedPlaylists[pl.id]}
-                    onChange={(e) =>
-                      handlePlaylistSelect(pl.id, e.target.checked)
-                    }
-                  />
-                </label>
-                <button
-                  className="playlist-button"
-                  onClick={() => toggleCollapse(pl.id)}
-                >
-                  {collapsedPlaylists[pl.id] ? "▶" : "▼"}{" "}
-                  <span
-                    style={{ wordBreak: "break-word", whiteSpace: "normal" }}
+        ) : (
+          <div className="download-container">
+            <label>
+              File format:
+              <select
+                value={fileFormat}
+                onChange={(e) => setFileFormat(e.target.value)}
+                style={{ marginLeft: 8 }}
+              >
+                <option value="csv">CSV</option>
+                <option value="json">JSON</option>
+                <option value="txt">TXT</option>
+              </select>
+            </label>
+            <button
+              className="accent-btn"
+              onClick={handleDownload}
+              disabled={downloading}
+              style={{ marginLeft: 16 }}
+            >
+              {downloading ? "Preparing..." : "Download"}
+            </button>
+          </div>
+        )}
+        {skippedTracks.length > 0 && (
+          <div
+            style={{
+              margin: "16px 0",
+              padding: 12,
+              border: "1px solid #ff6b6b",
+              borderRadius: 4,
+              backgroundColor: "#fff5f5",
+            }}
+          >
+            <div
+              style={{
+                cursor: "pointer",
+                fontWeight: "bold",
+                color: "#d63031",
+              }}
+              onClick={() => setShowSkippedTracks(!showSkippedTracks)}
+            >
+              {skippedTracks.length} track
+              {skippedTracks.length !== 1 ? "s" : ""} weren't able to be
+              processed: {showSkippedTracks ? "▼" : "▶"} Show list
+            </div>
+            {showSkippedTracks && (
+              <ul
+                style={{
+                  marginTop: 8,
+                  marginBottom: 0,
+                  paddingLeft: 20,
+                  color: "#d63031",
+                }}
+              >
+                {skippedTracks.map((track, index) => (
+                  <li key={index} style={{ marginBottom: 4 }}>
+                    <strong>{track.title}</strong> ({track.playlistName})
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        {downloading && (
+          <div
+            style={{
+              margin: "2rem 0",
+              width: "100%",
+              textAlign: "center",
+              color: "#fff5f5",
+            }}
+          >
+            <strong>
+              Large libraries may take a while to download. Please do not
+              refresh the page
+            </strong>
+          </div>
+        )}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            marginBottom: "16px",
+            gap: "8px",
+          }}
+        >
+          <button className="form-btn" onClick={() => setShowForm(!showForm)}>
+            {showForm
+              ? "Hide form"
+              : "Want to tell me why you're using this tool? (show optional Google form)"}
+          </button>
+          <iframe
+            style={{ transition: "all 200ms" }}
+            src="https://docs.google.com/forms/d/e/1FAIpQLSd7zkECkk_yI6RxsC0dKoHyU-cUK5-KePUS8vVTE2GpG0oehw/viewform?embedded=true"
+            width="640"
+            height={showForm ? "1200" : "0"}
+            frameBorder="0"
+            marginHeight="0"
+            marginWidth="0"
+          >
+            Loading…
+          </iframe>
+        </div>
+        {anyTracksLoading ? (
+          <label>
+            <div className="loading-container" aria-label="Loading...">
+              <div
+                style={{ width: "300px", height: "24px" }}
+                className="shimmer"
+              ></div>
+            </div>
+          </label>
+        ) : (
+          <label>
+            <input
+              type="checkbox"
+              checked={allPlaylistsSelected}
+              onChange={(e) => handleSelectAllPlaylists(e.target.checked)}
+            />
+            Select All Playlists and Songs
+          </label>
+        )}
+        <ul>
+          {playlists.map((pl) => (
+            <li key={pl.id}>
+              {loading || anyTracksLoading ? (
+                <div className="loading-container" aria-label="Loading...">
+                  <div
+                    style={{ width: "100%", height: "24px" }}
+                    className="shimmer"
+                  ></div>
+                </div>
+              ) : (
+                <div className="playlist-container">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={!!selectedPlaylists[pl.id]}
+                      onChange={(e) =>
+                        handlePlaylistSelect(pl.id, e.target.checked)
+                      }
+                    />
+                  </label>
+                  <button
+                    className="playlist-button"
+                    onClick={() => toggleCollapse(pl.id)}
                   >
-                    {pl.name}
-                    {tracks[pl.id]
-                      ? ` (${tracks[pl.id].length} songs: ${
-                          Object.values(selectedTracks[pl.id] || {}).filter(
-                            Boolean
-                          ).length
-                        } selected)`
-                      : ""}
-                  </span>
-                </button>
-              </div>
-            )}
+                    {collapsedPlaylists[pl.id] ? "▶" : "▼"}{" "}
+                    <span
+                      style={{ wordBreak: "break-word", whiteSpace: "normal" }}
+                    >
+                      {pl.name}
+                      {tracks[pl.id]
+                        ? ` (${tracks[pl.id].length} songs: ${
+                            Object.values(selectedTracks[pl.id] || {}).filter(
+                              Boolean
+                            ).length
+                          } selected)`
+                        : ""}
+                    </span>
+                  </button>
+                </div>
+              )}
 
-            {tracks[pl.id] && !collapsedPlaylists[pl.id] && (
-              <div style={{ marginLeft: 20 }}>
-                <ul className="playlist-tracks">
-                  {tracks[pl.id].map((track) => (
-                    <li key={`${pl.id}-${track.id}`} className="playlist-track">
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={!!selectedTracks[pl.id]?.[track.id]}
-                          onChange={(e) =>
-                            handleTrackSelect(pl.id, track.id, e.target.checked)
-                          }
-                        />
-                        <span className="playlist-track-title">
-                          <strong>{track.title}</strong> –{" "}
-                          {track.artists.join(", ")}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </li>
-        ))}
-      </ul>
-    </div>
+              {tracks[pl.id] && !collapsedPlaylists[pl.id] && (
+                <div style={{ marginLeft: 20 }}>
+                  <ul className="playlist-tracks">
+                    {tracks[pl.id].map((track) => (
+                      <li
+                        key={`${pl.id}-${track.id}`}
+                        className="playlist-track"
+                      >
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={!!selectedTracks[pl.id]?.[track.id]}
+                            onChange={(e) =>
+                              handleTrackSelect(
+                                pl.id,
+                                track.id,
+                                e.target.checked
+                              )
+                            }
+                          />
+                          <span className="playlist-track-title">
+                            <strong>{track.title}</strong> –{" "}
+                            {track.artists.join(", ")}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </>
   );
 }
 

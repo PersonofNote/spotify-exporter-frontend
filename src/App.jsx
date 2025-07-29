@@ -643,7 +643,7 @@ function App() {
                         <li 
                           key={track.id} 
                           style={{ 
-                            padding: '0.5rem', 
+                            padding: '0.5rem',
                             backgroundColor: selectedPublicTracks[track.id] ? '#222222' : 'transparent'
                           }}
                         >

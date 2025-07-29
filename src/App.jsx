@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { tokenManager, setupAxiosInterceptors } from "./auth.js";
 import "./App.css";
+import { Analytics } from "@vercel/analytics/react"
 
 const IS_LOCAL = ["localhost", "127.0.0.1"].includes(window.location.hostname);
 
@@ -905,6 +906,7 @@ function App() {
           ))}
         </ul>
       </div>
+      <Analytics />
     </>
   );
 }

@@ -34,6 +34,14 @@ function App() {
   const [showForm, setShowForm] = useState(false);
   const [_userQuota, setUserQuota] = useState(null);
   
+  // Album state
+  const [albums, setAlbums] = useState([]);
+  const [selectedAlbums, setSelectedAlbums] = useState({});
+  const [albumTracks, setAlbumTracks] = useState({}); // { albumId: [tracks] }
+  const [selectedAlbumTracks, setSelectedAlbumTracks] = useState({}); // { albumId: { trackId: true } }
+  const [collapsedAlbums, setCollapsedAlbums] = useState({}); // { albumId: true/false }
+  const [loadingAlbumTracks, setLoadingAlbumTracks] = useState({}); // { albumId: true/false }
+  
   // Public playlist state
   const [playlistUrl, setPlaylistUrl] = useState("");
   const [publicPlaylist, setPublicPlaylist] = useState(null);
@@ -118,31 +126,49 @@ function App() {
     };
   }, []);
 
-  // Fetch playlists when authenticated
+  // Helper function to handle API errors
+  const handleApiError = (err, errorMessage) => {
+    console.error(errorMessage, err);
+    if (err.response?.status === 401) {
+      setAuthenticated(false);
+      tokenManager.removeToken();
+      setError("Your session has expired. Please log in again.");
+    } else if (err.response?.status === 429) {
+      setError(
+        `Rate limit exceeded. Some or all data was not fetched. ${
+          err.response.data.resetTime || "Try again later."
+        }`
+      );
+    } else {
+      setError(errorMessage);
+    }
+  };
+
+  // Fetch playlists and albums when authenticated
   useEffect(() => {
     if (authenticated && tokenManager.hasToken()) {
+      // Fetch playlists
       axios
         .get(`${API_BASE_URL}/api/playlists`)
         .then((res) => {
           setPlaylists(res.data.playlists);
-          setUserQuota(res.data.quota); // Update quota after API call
-          setError(""); // Clear any previous errors
+          setUserQuota(res.data.quota);
+          setError("");
         })
         .catch((err) => {
-          console.error("Failed to fetch playlists:", err);
-          if (err.response?.status === 401) {
-            setAuthenticated(false);
-            tokenManager.removeToken();
-            setError("Your session has expired. Please log in again.");
-          } else if (err.response?.status === 429) {
-            setError(
-              `Rate limit exceeded. Some or all songs were not fetched. ${
-                err.response.data.resetTime || "Try again later."
-              }`
-            );
-          } else {
-            setError("Failed to fetch playlists");
-          }
+          handleApiError(err, "Failed to fetch playlists");
+        });
+      
+      // Fetch albums
+      axios
+        .get(`${API_BASE_URL}/api/albums`)
+        .then((res) => {
+          setAlbums(res.data.albums);
+          setUserQuota(res.data.quota);
+          setError("");
+        })
+        .catch((err) => {
+          handleApiError(err, "Failed to fetch albums");
         });
     }
   }, [authenticated]);
@@ -303,22 +329,29 @@ function App() {
       })
       .catch((err) => {
         console.error("Failed to fetch tracks for playlist:", playlistId, err);
-        if (err.response?.status === 401) {
-          setAuthenticated(false);
-          tokenManager.removeToken();
-          setError("Your session has expired. Please log in again.");
-        } else if (err.response?.status === 429) {
-          setError(
-            `Rate limit exceeded: Some or all songs were not fetched. ${
-              err.response.data.resetTime || "Try again later."
-            }`
-          );
-        } else {
-          setError("Failed to fetch tracks");
-        }
+        handleApiError(err, "Failed to fetch tracks");
       })
       .finally(() => {
         setLoadingTracks((lt) => ({ ...lt, [playlistId]: false }));
+      });
+  };
+
+  const fetchAlbumTracks = (albumId) => {
+    if (albumTracks[albumId] || loadingAlbumTracks[albumId]) return;
+
+    setLoadingAlbumTracks((lt) => ({ ...lt, [albumId]: true }));
+    axios
+      .get(`${API_BASE_URL}/api/albums/${albumId}/tracks`)
+      .then((res) => {
+        setAlbumTracks((t) => ({ ...t, [albumId]: res.data.tracks }));
+        setUserQuota(res.data.quota);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch tracks for album:", albumId, err);
+        handleApiError(err, "Failed to fetch album tracks");
+      })
+      .finally(() => {
+        setLoadingAlbumTracks((lt) => ({ ...lt, [albumId]: false }));
       });
   };
 
@@ -373,8 +406,67 @@ function App() {
     }));
   };
 
+  const handleSelectAllAlbums = (checked) => {
+    const newSelectedAlbums = {};
+    const newSelectedAlbumTracks = {};
+    albums.forEach((album) => {
+      newSelectedAlbums[album.id] = checked;
+      if (checked) {
+        // If tracks are loaded, select all songs
+        if (albumTracks[album.id]) {
+          newSelectedAlbumTracks[album.id] = Object.fromEntries(
+            albumTracks[album.id].map((track) => [track.id, true])
+          );
+        } else {
+          // If not loaded, fetch and select all when loaded
+          fetchAlbumTracks(album.id);
+        }
+      } else {
+        newSelectedAlbumTracks[album.id] = {};
+      }
+    });
+    setSelectedAlbums(newSelectedAlbums);
+    setSelectedAlbumTracks(newSelectedAlbumTracks);
+  };
+
+  const handleAlbumSelect = (albumId, checked) => {
+    setSelectedAlbums((a) => ({ ...a, [albumId]: checked }));
+    if (checked) {
+      if (albumTracks[albumId]) {
+        setSelectedAlbumTracks((st) => ({
+          ...st,
+          [albumId]: Object.fromEntries(
+            albumTracks[albumId].map((track) => [track.id, true])
+          ),
+        }));
+      } else {
+        fetchAlbumTracks(albumId);
+      }
+    } else {
+      setSelectedAlbumTracks((st) => ({ ...st, [albumId]: {} }));
+    }
+  };
+
+  const handleAlbumTrackSelect = (albumId, trackId, checked) => {
+    setSelectedAlbumTracks((st) => ({
+      ...st,
+      [albumId]: {
+        ...st[albumId],
+        [trackId]: checked,
+      },
+    }));
+  };
+
+  const toggleAlbumCollapse = (albumId) => {
+    if (!albumTracks[albumId]) fetchAlbumTracks(albumId);
+    setCollapsedAlbums((ca) => ({ ...ca, [albumId]: !ca[albumId] }));
+  };
+
   const allPlaylistsSelected =
     playlists.length > 0 && playlists.every((pl) => selectedPlaylists[pl.id]);
+    
+  const allAlbumsSelected =
+    albums.length > 0 && albums.every((album) => selectedAlbums[album.id]);
 
   useEffect(() => {
     playlists.forEach((pl) => {
@@ -393,6 +485,24 @@ function App() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tracks]);
+
+  useEffect(() => {
+    albums.forEach((album) => {
+      if (
+        selectedAlbums[album.id] &&
+        albumTracks[album.id] &&
+        Object.keys(selectedAlbumTracks[album.id] || {}).length === 0
+      ) {
+        setSelectedAlbumTracks((st) => ({
+          ...st,
+          [album.id]: Object.fromEntries(
+            albumTracks[album.id].map((track) => [track.id, true])
+          ),
+        }));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [albumTracks]);
 
   const toggleCollapse = (playlistId) => {
     if (!tracks[playlistId]) fetchTracks(playlistId);
@@ -421,15 +531,41 @@ function App() {
   }, [playlists]);
 
   const getSelectionForBackend = () => {
-    return playlists
+    const selection = [];
+    
+    // Add selected playlists
+    playlists
       .filter((pl) => selectedPlaylists[pl.id])
-      .map((pl) => ({
-        playlistId: pl.id,
-        trackIds: (tracks[pl.id] || [])
+      .forEach((pl) => {
+        const trackIds = (tracks[pl.id] || [])
           .filter((track) => selectedTracks[pl.id]?.[track.id])
-          .map((track) => track.id),
-      }))
-      .filter((sel) => sel.trackIds.length > 0);
+          .map((track) => track.id);
+        
+        if (trackIds.length > 0) {
+          selection.push({
+            playlistId: pl.id,
+            trackIds
+          });
+        }
+      });
+    
+    // Add selected albums
+    albums
+      .filter((album) => selectedAlbums[album.id])
+      .forEach((album) => {
+        const trackIds = (albumTracks[album.id] || [])
+          .filter((track) => selectedAlbumTracks[album.id]?.[track.id])
+          .map((track) => track.id);
+        
+        if (trackIds.length > 0) {
+          selection.push({
+            albumId: album.id,
+            trackIds
+          });
+        }
+      });
+    
+    return selection;
   };
 
   const handleDownload = async () => {
@@ -437,7 +573,7 @@ function App() {
     try {
       const selection = getSelectionForBackend();
       if (selection.length === 0) {
-        alert("Please select at least one playlist and song.");
+        alert("Please select at least one playlist or album and song.");
         setDownloading(false);
         return;
       }
@@ -905,6 +1041,103 @@ function App() {
             </li>
           ))}
         </ul>
+        {/* Saved Albums Section  TODO: Implement properly 
+        <h3 style={{ marginTop: "2rem" }}>Saved Albums</h3>
+        {Object.values(loadingAlbumTracks).some(Boolean) ? (
+          <label>
+            <div className="loading-container" aria-label="Loading...">
+              <div
+                style={{ width: "300px", height: "24px" }}
+                className="shimmer"
+              ></div>
+            </div>
+          </label>
+        ) : (
+          <label>
+            <input
+              type="checkbox"
+              checked={allAlbumsSelected}
+              onChange={(e) => handleSelectAllAlbums(e.target.checked)}
+            />
+            Select All Albums and Songs
+          </label>
+        )}
+        <ul>
+          {albums.map((album) => (
+            <li key={album.id}>
+              {loading || Object.values(loadingAlbumTracks).some(Boolean) ? (
+                <div className="loading-container" aria-label="Loading...">
+                  <div
+                    style={{ width: "100%", height: "24px" }}
+                    className="shimmer"
+                  ></div>
+                </div>
+              ) : (
+                <div className="playlist-container">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={!!selectedAlbums[album.id]}
+                      onChange={(e) =>
+                        handleAlbumSelect(album.id, e.target.checked)
+                      }
+                    />
+                  </label>
+                  <button
+                    className="playlist-button"
+                    onClick={() => toggleAlbumCollapse(album.id)}
+                  >
+                    {collapsedAlbums[album.id] ? "▶" : "▼"}{" "}
+                    <span
+                      style={{ wordBreak: "break-word", whiteSpace: "normal" }}
+                    >
+                      {album.name}
+                      {albumTracks[album.id]
+                        ? ` (${albumTracks[album.id].length} songs: ${
+                            Object.values(selectedAlbumTracks[album.id] || {}).filter(
+                              Boolean
+                            ).length
+                          } selected)`
+                        : ""}
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              {albumTracks[album.id] && !collapsedAlbums[album.id] && (
+                <div style={{ marginLeft: 20 }}>
+                  <ul className="playlist-tracks">
+                    {albumTracks[album.id].map((track) => (
+                      <li
+                        key={`${album.id}-${track.id}`}
+                        className="playlist-track"
+                      >
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={!!selectedAlbumTracks[album.id]?.[track.id]}
+                            onChange={(e) =>
+                              handleAlbumTrackSelect(
+                                album.id,
+                                track.id,
+                                e.target.checked
+                              )
+                            }
+                          />
+                          <span className="playlist-track-title">
+                            <strong>{track.title}</strong> –{" "}
+                            {track.artists.join(", ")}
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+        */}
       </div>
       <Analytics />
     </>

@@ -50,6 +50,11 @@ function App() {
   const [fetchingPublicPlaylist, setFetchingPublicPlaylist] = useState(false);
   const [publicPlaylistError, setPublicPlaylistError] = useState("");
 
+  useEffect(() => {
+    console.log(publicPlaylist)
+    console.log(publicTracks)
+  },[publicPlaylist, publicTracks])
+
   // Check authentication status on mount
   useEffect(() => {
     // Check if we have a valid token
@@ -289,7 +294,7 @@ function App() {
         },
         { responseType: "blob" }
       );
-
+      console.log("Response from download:")
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const a = document.createElement("a");
       a.href = url;
@@ -792,7 +797,7 @@ function App() {
                               style={{ marginRight: '0.5rem' }}
                             />
                             <span>
-                              <strong>{track.title}</strong> – {track.artists.join(', ')}
+                              <strong>{track.title}</strong> ({track.artists.join(', ')}) - Album: {track.album}
                             </span>
                           </label>
                         </li>
